@@ -28,41 +28,29 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
-      - name: Check Android Gradle project
+      - name: Validate Gradle wrapper
         run: |
-          if [ ! -f "./gradlew" ]; then
-            echo "::error::gradlew dosyası bulunamadı."
-            exit 1
-          fi
-
-          if [ ! -f "./settings.gradle" ] && [ ! -f "./settings.gradle.kts" ]; then
-            echo "::error::Gradle settings dosyası bulunamadı."
-            exit 1
-          fi
-
           chmod +x ./gradlew
-
-      - name: Show Java and Gradle versions
-        run: |
-          java -version
           ./gradlew --version
 
-      - name: Clean and Build Debug APK
+      - name: Build Debug APK
         run: |
           ./gradlew --no-daemon --stacktrace clean assembleDebug
 
-      - name: Verify APK output
+      - name: Verify APK
         run: |
-          echo "Oluşturulan APK dosyaları:"
-          find . -type f -path "*/build/outputs/apk/debug/*.apk" -print
+          APK=$(find . -type f -path "*/build/outputs/apk/debug/*.apk" -print -quit)
 
-          if ! find . -type f -path "*/build/outputs/apk/debug/*.apk" -print -quit | grep -q .; then
-            echo "::error::APK oluşturulamadı."
+          if [ -z "$APK" ]; then
+            echo "::error::APK oluşturulamadı!"
             exit 1
           fi
 
-      - name: Upload APK artifact
+          echo "APK başarıyla oluşturuldu: $APK"
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Karui-APK
