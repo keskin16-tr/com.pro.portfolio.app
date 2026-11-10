@@ -520,16 +520,19 @@ class MainActivity : AppCompatActivity() {
                     else -> null
                 }
 
+                
                 if (price != null && price > 0) {
-                    // USD/USDT cinsinden gelen fiyatlar
-                    // henüz TRY dönüşümüne tabi değildir.
-                    // Yalnızca TRY kotasyonlu semboller
-                    // TL portföy hesabında kullanılmalıdır.
-                    if (asset.symbol.endsWith("TRY")) {
+                    val isTryQuoted = when (asset.type) {
+                        "Hisse" -> asset.symbol.endsWith(".IS")
+                        "Kripto" -> asset.symbol.endsWith("TRY")
+                        else -> false
+                    }
+
+                    if (isTryQuoted) {
                         db.updatePrice(asset.symbol, price)
                         updated++
                     }
-                }
+                }   
             }
 
             status.text = "Son kontrol: " +
