@@ -16,7 +16,6 @@ permissions:
 jobs:
 - name: Build with Gradle and Info logs
   run: ./gradlew compileDebugKotlin --info
-    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
