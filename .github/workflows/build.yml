@@ -14,8 +14,8 @@ permissions:
   contents: read
 
 jobs:
-- name: Build with Gradle and Info logs
-  run: ./gradlew compileDebugKotlin --info
+- name: Build with Gradle
+  run: ./gradlew build
 
     steps:
       - name: Checkout repository
