@@ -14,9 +14,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build Debug APK
-    runs-on: ubuntu-26.04
+- name: Build with Gradle and Info logs
+  run: ./gradlew compileDebugKotlin --info
     timeout-minutes: 45
 
     steps:
