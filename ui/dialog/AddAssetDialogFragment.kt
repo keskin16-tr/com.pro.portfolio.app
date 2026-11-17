@@ -7,10 +7,9 @@ import android.view.ViewGroup
 import android.widget.Toast
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.portfolio.app.databinding.DialogAddAssetBinding
+import java.util.Locale
 
-class AddAssetDialogFragment(private val onSave: (String, String, Double, Double) -> Unit) :
-    BottomSheetDialogFragment() {
-
+class AddAssetDialogFragment(private val onSave: (String, String, Double, Double) -> Unit) : BottomSheetDialogFragment() {
     private var _binding: DialogAddAssetBinding? = null
     private val binding get() = _binding!!
 
@@ -21,21 +20,21 @@ class AddAssetDialogFragment(private val onSave: (String, String, Double, Double
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         binding.btnSave.setOnClickListener {
-            val name = binding.etName.text.toString().trim()
-            val ticker = binding.etTicker.text.toString().trim()
-            val quantity = binding.etQuantity.text.toString().toDoubleOrNull()
-            val costPrice = binding.etCostPrice.text.toString().toDoubleOrNull()
-
-            if (name.isNotEmpty() && ticker.isNotEmpty() && quantity != null && costPrice != null) {
+            val name = binding.etName.text?.toString()?.trim().orEmpty()
+            val ticker = binding.etTicker.text?.toString()?.trim()?.uppercase(Locale.ROOT).orEmpty()
+            val quantity = parseNumber(binding.etQuantity.text?.toString().orEmpty())
+            val costPrice = parseNumber(binding.etCostPrice.text?.toString().orEmpty())
+            if (name.isNotBlank() && ticker.isNotBlank() && quantity != null && costPrice != null && quantity > 0.0 && costPrice >= 0.0) {
                 onSave(name, ticker, quantity, costPrice)
                 dismiss()
             } else {
-                Toast.makeText(requireContext(), "Lütfen tüm alanları doğru doldurun!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Geçerli ad, sembol, pozitif miktar ve maliyet girin.", Toast.LENGTH_LONG).show()
             }
         }
     }
+
+    private fun parseNumber(raw: String): Double? = raw.trim().replace(" ", "").replace(",", ".").toDoubleOrNull()?.takeIf { it.isFinite() }
 
     override fun onDestroyView() {
         super.onDestroyView()
