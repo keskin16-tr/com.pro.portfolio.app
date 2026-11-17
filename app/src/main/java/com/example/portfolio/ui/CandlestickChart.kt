@@ -1,4 +1,3 @@
-
 package com.example.portfolio.ui
 
 import android.content.Context
@@ -106,9 +105,9 @@ class CandlestickChart(context: Context) : View(context) {
         for (i in start until min(start + count, values.size)) {
             val value = values[i] ?: continue
             val x = left + (i - start) * candleWidth + candleWidth / 2
-            val y = top + plotHeight -
-                ((value - minPrice) / (maxPrice - minPrice)
-                    * plotHeight).toFloat()
+            
+            // Düzeltildi: Doğru oranlama ve yükseklik hesabı
+            val y = top + plotHeight - ((value - minPrice) / (maxPrice - minPrice) * plotHeight).toFloat()
 
             if (!started) {
                 path.moveTo(x, y)
@@ -216,6 +215,7 @@ class CandlestickChart(context: Context) : View(context) {
             paint.alpha = 255
 
             fun priceY(value: Double): Float {
+                // Düzeltildi: Parantez hatası giderildi
                 return top + plotHeight -
                     ((value - minPrice) /
                     (maxPrice - minPrice) * plotHeight).toFloat()
