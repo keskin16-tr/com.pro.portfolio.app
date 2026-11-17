@@ -1,9 +1,33 @@
+package com.example.portfolio.analytics
 
-fun ema20(values: List<Double>) = ema(values, 20)
+// Temel EMA hesaplama fonksiyonu (Eğer projede tanımlı değilse eksikliği gidermek için eklenmiştir)
+fun ema(values: List<Double>, period: Int): List<Double?> {
+    if (values.isEmpty() || period <= 0) return List(values.size) { null }
+    val result = MutableList<Double?>(values.size) { null }
+    val multiplier = 2.0 / (period + 1)
+    
+    var sum = 0.0
+    var count = 0
+    for (i in values.indices) {
+        if (i < period) {
+            sum += values[i]
+            count++
+            if (count == period) {
+                result[i] = sum / period
+            }
+        } else {
+            val prev = result[i - 1] ?: continue
+            result[i] = (values[i] - prev) * multiplier + prev
+        }
+    }
+    return result
+}
 
-fun ema50(values: List<Double>) = ema(values, 50)
+fun ema20(values: List<Double>): List<Double?> = ema(values, 20)
 
-fun ema200(values: List<Double>) = ema(values, 200)
+fun ema50(values: List<Double>): List<Double?> = ema(values, 50)
+
+fun ema200(values: List<Double>): List<Double?> = ema(values, 200)
 
 data class StochasticResult(
     val k: List<Double?>,
@@ -29,13 +53,15 @@ fun stochastic(
 
     for (i in period - 1 until closes.size) {
         val highest = highs
-            .subList(i - period + 1, i + 1).maxOrNull() ?: continue
+            .subList(i - period + 1, i + 1)
+            .maxOrNull() ?: continue
 
         val lowest = lows
-            .subList(i - period + 1, i + 1).minOrNull() ?: continue
+            .subList(i - period + 1, i + 1)
+            .minOrNull() ?: continue
 
         k[i] = if (highest == lowest) 50.0
-        else (closes[i] - lowest) / (highest - lowest) * 100
+        else (closes[i] - lowest) / (highest - lowest) * 100.0
     }
 
     val d = MutableList<Double?>(closes.size) { null }
