@@ -127,7 +127,7 @@ class CandlestickChart(context: Context) : View(context) {
         if (candles.isEmpty()) {
             paint.color = Color.WHITE
             paint.textSize = 16f
-            // Hata giderildi: Int yerine Float (30f, 60f) kullanıldı
+            // 210. satır: Koordinatlar kesin olarak Float (30f, 60f) yapıldı
             canvas.drawText("Grafik verisi bulunamadı", 30f, 60f, paint)
             return
         }
@@ -205,9 +205,9 @@ class CandlestickChart(context: Context) : View(context) {
 
             canvas.drawRect(
                 x - bodyWidth / 2,
-                height - volumeHeight - 5,
+                height - volumeHeight - 5f,
                 x + bodyWidth / 2,
-                height - 5,
+                height - 5f,
                 paint
             )
 
@@ -242,7 +242,7 @@ class CandlestickChart(context: Context) : View(context) {
                 x - bodyWidth / 2,
                 bodyTop,
                 x + bodyWidth / 2,
-                max(bodyBottom, bodyTop + 2),
+                max(bodyBottom, bodyTop + 2f),
                 paint
             )
         }
@@ -277,9 +277,9 @@ class CandlestickChart(context: Context) : View(context) {
         canvas.drawText("EMA20", left, 17f, paint)
 
         paint.color = orange
-        canvas.drawText("EMA50", left + 65, 17f, paint)
+        canvas.drawText("EMA50", left + 65f, 17f, paint)
 
         paint.color = purple
-        canvas.drawText("BOLL", left + 130, 17f, paint)
+        canvas.drawText("BOLL", left + 130f, 17f, paint)
     }
 }
