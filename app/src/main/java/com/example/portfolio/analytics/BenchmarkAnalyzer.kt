@@ -1,4 +1,3 @@
-
 package com.example.portfolio.analytics
 
 import com.example.portfolio.model.PricePoint
@@ -27,18 +26,18 @@ object BenchmarkAnalyzer {
             return null
         }
 
-        val sortedPortfolio = portfolio.sortedBy { it.first }
-        val sortedBenchmark = benchmark.sortedBy { it.timestamp }
+        val sortedPortfolio = portfolio.sortedBy { pair: Pair<Long, Double> -> pair.first }
+        val sortedBenchmark = benchmark.sortedBy { point: PricePoint -> point.timestamp }
 
         val firstPortfolio = sortedPortfolio.first()
         val lastPortfolio = sortedPortfolio.last()
 
-        val firstBenchmark = sortedBenchmark.minByOrNull {
-            kotlin.math.abs(it.timestamp - firstPortfolio.first)
+        val firstBenchmark = sortedBenchmark.minByOrNull { point: PricePoint ->
+            kotlin.math.abs(point.timestamp - firstPortfolio.first)
         } ?: return null
 
-        val lastBenchmark = sortedBenchmark.minByOrNull {
-            kotlin.math.abs(it.timestamp - lastPortfolio.first)
+        val lastBenchmark = sortedBenchmark.minByOrNull { point: PricePoint ->
+            kotlin.math.abs(point.timestamp - lastPortfolio.first)
         } ?: return null
 
         if (firstPortfolio.second <= 0 ||
@@ -53,9 +52,9 @@ object BenchmarkAnalyzer {
         val portfolioPercent =
             (lastPortfolio.second / firstPortfolio.second - 1) * 100
 
-        val points = sortedPortfolio.mapNotNull { item ->
-            val matching = sortedBenchmark.minByOrNull {
-                kotlin.math.abs(it.timestamp - item.first)
+        val points = sortedPortfolio.mapNotNull { item: Pair<Long, Double> ->
+            val matching = sortedBenchmark.minByOrNull { point: PricePoint ->
+                kotlin.math.abs(point.timestamp - item.first)
             } ?: return@mapNotNull null
 
             if (matching.price <= 0 || firstBenchmark.price <= 0) {
