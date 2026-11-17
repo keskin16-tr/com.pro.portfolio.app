@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="portfolio_navy">#0B1220</color>
+    <color name="portfolio_surface">#121D2D</color>
+    <color name="portfolio_surface_alt">#1A2940</color>
+    <color name="portfolio_text">#F3F6FC</color>
+    <color name="portfolio_muted">#91A2BB</color>
+    <color name="portfolio_green">#31D0AA</color>
+    <color name="portfolio_blue">#6D9BFF</color>
+    <color name="portfolio_purple">#A78BFA</color>
+    <color name="portfolio_orange">#F5B66B</color>
+</resources>
