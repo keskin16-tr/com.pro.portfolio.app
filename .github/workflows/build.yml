@@ -1,59 +1,42 @@
-
-name: Build Android APK
+name: Portfolio Pro Android APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [main, portfolio-pro-3.0]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    name: Build Debug APK
-    runs-on: ubuntu-26.04
-    timeout-minutes: 45
-
+    name: Build and verify APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
-          cache: gradle
-
-      - name: Validate Gradle wrapper
-        run: |
-          chmod +x ./gradlew
-          ./gradlew --version
-
-      - name: Build Debug APK
-        run: |
-          ./gradlew --no-daemon --stacktrace clean assembleDebug
-
-      - name: Verify APK
-        run: |
-          APK=$(find . -type f -path "*/build/outputs/apk/debug/*.apk" -print -quit)
-
-          if [ -z "$APK" ]; then
-            echo "::error::APK oluşturulamadı!"
-            exit 1
-          fi
-
-          echo "APK başarıyla oluşturuldu: $APK"
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v5
+          java-version: '17'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
-          name: Karui-APK
-          path: '**/build/outputs/apk/debug/*.apk'
+          gradle-version: '8.7'
+      - name: Build debug APK
+        run: gradle --no-daemon --stacktrace assembleDebug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Portfolio-Pro-debug
+          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
