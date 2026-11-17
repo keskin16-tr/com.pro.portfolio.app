@@ -1,134 +1,87 @@
-
 package com.example.portfolio.ui
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.util.AttributeSet
 import android.view.View
+import androidx.core.content.ContextCompat
 
-class IndicatorChart(context: Context) : View(context) {
+class IndicatorChart @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : View(context, attrs, defStyleAttr) {
 
-    enum class Mode { RSI, MACD }
+    private var dataValues: List<Double> = emptyList()
+    private var chartColor: Int = ContextCompat.getColor(context, android.R.color.holo_blue_light)
 
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private var mode = Mode.RSI
-
-    private var first = emptyList<Double?>()
-    private var second = emptyList<Double?>()
-    private var third = emptyList<Double?>()
-
-    fun submit(
-        mode: Mode,
-        first: List<Double?>,
-        second: List<Double?> = emptyList(),
-        third: List<Double?> = emptyList()
-    ) {
-        this.mode = mode
-        this.first = first
-        this.second = second
-        this.third = third
-        invalidate()
+    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
     }
 
-    private fun drawSeries(
-        canvas: Canvas,
-        values: List<Double?>,
-        color: Int,
-        minValue: Double,
-        maxValue: Double
-    ) {
-        val valid = values.size
-        if (valid < 2) return
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
 
-        val left = 40f
-        val right = width - 12f
-        val top = 20f
-        val bottom = height - 20f
+    private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1f
+        color = 0x33FFFFFF
+    }
 
-        paint.color = color
-        paint.strokeWidth = 2.2f
-        paint.style = Paint.Style.STROKE
-
-        val path = Path()
-        var started = false
-
-        values.forEachIndexed { i, value ->
-            if (value == null) {
-                started = false
-                return@forEachIndexed
-            }
-
-            val x = left + i.toFloat() /
-                (valid - 1) * (right - left)
-
-            val y = bottom -
-                ((value - minValue) /
-                (maxValue - minValue) *
-                (bottom - top)).toFloat()
-
-            if (!started) {
-                path.moveTo(x, y)
-                started = true
-            } else {
-                path.lineTo(x, y)
-            }
-        }
-
-        canvas.drawPath(path, paint)
-        paint.style = Paint.Style.FILL
+    fun setData(values: List<Double>, color: Int? = null) {
+        dataValues = values
+        color?.let { chartColor = it }
+        linePaint.color = chartColor
+        fillPaint.color = (chartColor and 0x00FFFFFF) or 0x22000000
+        invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.drawColor(Color.rgb(17, 28, 45))
 
-        val minValue = if (mode == Mode.RSI) 0.0 else
-            listOfNotNull(
-                first.minOrNull(),
-                second.minOrNull(),
-                third.minOrNull()
-            ).minOrNull()?.coerceAtMost(0.0) ?: -1.0
+        if (dataValues.size < 2) return
 
-        val maxValue = if (mode == Mode.RSI) 100.0 else
-            listOfNotNull(
-                first.maxOrNull(),
-                second.maxOrNull(),
-                third.maxOrNull()
-            ).maxOrNull()?.coerceAtLeast(1.0) ?: 1.0
+        val width = width.toFloat()
+        val height = height.toFloat()
 
-        paint.color = 0xFF304158.toInt()
-        paint.strokeWidth = 1f
+        if (width <= 0f || height <= 0f) return
 
-        for (i in 0..4) {
-            val y = 20f + (height - 40f) * i / 4
-            canvas.drawLine(40f, y, width - 12f, y, paint)
+        val minValue = dataValues.minByOrNull { it } ?: 0.0
+        val maxValue = dataValues.maxByOrNull { it } ?: 0.0
+        val range = if (maxValue == minValue) 1.0 else maxValue - minValue
+
+        for (i in 0..3) {
+            val y = height * i / 3f
+            canvas.drawLine(0f, y, width, y, gridPaint)
         }
 
-        if (mode == Mode.RSI) {
-            paint.color = 0xFFFFB84D.toInt()
-            val y30 = height - 20f - 0.30f * (height - 40f)
-            val y70 = height - 20f - 0.70f * (height - 40f)
+        val path = Path()
+        val fillPath = Path()
+        val stepX = width / (dataValues.size - 1)
 
-            paint.style = Paint.Style.STROKE
-            paint.pathEffect = android.graphics.DashPathEffect(
-                floatArrayOf(7f, 5f), 0f
-            )
+        dataValues.forEachIndexed { index, value ->
+            val x = index * stepX
+            val normalizedValue = (value - minValue) / range
+            val y = height - (normalizedValue.toFloat() * (height * 0.8f) + height * 0.1f)
 
-            canvas.drawLine(40f, y30, width - 12f, y30, paint)
-            canvas.drawLine(40f, y70, width - 12f, y70, paint)
-
-            paint.pathEffect = null
-            paint.style = Paint.Style.FILL
+            if (index == 0) {
+                path.moveTo(x, y)
+                fillPath.moveTo(x, height)
+                fillPath.lineTo(x, y)
+            } else {
+                path.lineTo(x, y)
+                fillPath.lineTo(x, y)
+            }
         }
 
-        drawSeries(canvas, first, Color.rgb(71, 130, 255),
-            minValue, maxValue)
+        fillPath.lineTo(width, height)
+        fillPath.close()
 
-        if (mode == Mode.MACD) {
-            drawSeries(canvas, second, Color.rgb(54, 214, 180),
-                minValue, maxValue)
-        }
+        canvas.drawPath(fillPath, fillPaint)
+        canvas.drawPath(path, linePaint)
     }
 }
