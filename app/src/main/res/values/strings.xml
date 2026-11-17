@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Portfolio Pro</string>
+    <string name="dashboard_title">Portföyüm</string>
+    <string name="invested_total">Toplam yatırım maliyeti</string>
+    <string name="asset_count">%1$d varlık</string>
+    <string name="holdings_title">Varlıklarım</string>
+    <string name="add_asset">Varlık ekle</string>
+    <string name="empty_portfolio">Henüz varlık eklemediniz</string>
+    <string name="empty_portfolio_hint">İlk yatırımınızı ekleyerek portföyünüzü oluşturmaya başlayın.</string>
+</resources>
