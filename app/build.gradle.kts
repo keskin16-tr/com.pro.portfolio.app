@@ -1,4 +1,3 @@
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -27,7 +26,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-// Kotlin 2.0+ için modern derleyici ayarı
     kotlin {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -42,4 +40,6 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // Ağ istekleri (MarketDataRepository) için OkHttp bağımlılığı
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
