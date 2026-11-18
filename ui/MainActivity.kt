@@ -36,6 +36,7 @@ import com.portfolio.app.data.local.AssetEntity
 import com.portfolio.app.data.local.DividendEntity
 import com.portfolio.app.data.local.TradeEntity
 import com.portfolio.app.data.local.PortfolioSnapshotEntity
+import com.portfolio.app.data.remote.MarketRate
 import com.portfolio.app.databinding.ActivityMainBinding
 import com.portfolio.app.ui.adapter.AssetAdapter
 import com.portfolio.app.ui.dialog.AddAssetDialogFragment
@@ -52,6 +53,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var dashboardView: View
     private lateinit var bottomNavigation: BottomNavigationView
     private var analyticsContainer: LinearLayout? = null
+    private var ratesContainer: LinearLayout? = null
     private val pageViews = mutableMapOf<Int, View>()
     private val pageTexts = mutableMapOf<Int, TextView>()
     private val pageLists = mutableMapOf<Int, LinearLayout>()
@@ -60,6 +62,9 @@ class MainActivity : AppCompatActivity() {
     private var currentTrades: List<TradeEntity> = emptyList()
     private var currentDividends: List<DividendEntity> = emptyList()
     private var currentSnapshots: List<PortfolioSnapshotEntity> = emptyList()
+    private var currentRates: List<MarketRate> = emptyList()
+    private var dailyPnlTry: Double? = null
+    private var dailyPnlUsd: Double? = null
     private val clockHandler = Handler(Looper.getMainLooper())
     private val clockUpdate = object : Runnable {
         override fun run() {
@@ -103,15 +108,13 @@ class MainActivity : AppCompatActivity() {
                 viewModel.assets.collect { assets ->
                     currentAssets = assets
                     assetAdapter.submitList(assets)
-                    val invested = assets.sumOf { it.quantity * it.costPrice }
-                    val marketValue = assets.sumOf { (it.lastPrice ?: it.costPrice) * it.quantity }
-                    binding.tvTotalValue.text = currency(marketValue)
+                    updateSummary()
                     binding.tvAssetCount.text = getString(R.string.asset_count, assets.size)
                     binding.tvHoldingsCount.text = "${assets.size} kayıt"
                     binding.tvEmptyState.visibility = if (assets.isEmpty()) View.VISIBLE else View.GONE
                     binding.tvChartEmpty.visibility = if (assets.isEmpty()) View.VISIBLE else View.GONE
                     binding.portfolioChart.setValues(assets.map { ((it.lastPrice ?: it.costPrice) * it.quantity).toFloat() })
-                    binding.tvHeaderTitle.contentDescription = "Portföy kâr/zarar: ${currency(marketValue - invested)}"
+
                     binding.btnSellAsset.isEnabled = assets.any { it.quantity > 0.0 }
                     updatePageContent()
                 }
@@ -119,12 +122,7 @@ class MainActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.totalDividends.collect { binding.tvDividendTotal.text = currency(it) }
-            }
-        }
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.trades.collect { currentTrades = it; renderTrades(it, currentAssets); updatePageContent() }
+                viewModel.trades.collect { currentTrades = it; renderTrades(it, currentAssets); updateSummary(); updatePageContent() }
             }
         }
         lifecycleScope.launch {
@@ -135,6 +133,21 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.snapshots.collect { currentSnapshots = it; updatePageContent() }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.dailyPnlTry.collect { dailyPnlTry = it; updateSummary() }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.dailyPnlUsd.collect { dailyPnlUsd = it; updateSummary() }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.rates.collect { currentRates = it; renderMarketRates() }
             }
         }
     }
@@ -151,8 +164,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showAddAssetDialog() {
-        AddAssetDialogFragment { name, ticker, quantity, costPrice, category, broker ->
-            viewModel.addAsset(name, ticker, quantity, costPrice, category, broker)
+        AddAssetDialogFragment { name, ticker, quantity, costPrice, category, broker, currencyCode, priceSource ->
+            viewModel.addAsset(name, ticker, quantity, costPrice, category, broker, currencyCode, priceSource)
         }.show(supportFragmentManager, "AddAssetDialog")
     }
 
@@ -197,7 +210,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupNavigation() {
         val root = binding.root
-        val pages = listOf(NAV_ASSETS, NAV_TRADES, NAV_DIVIDENDS, NAV_ANALYTICS, NAV_EXPORT, NAV_MORE, NAV_CATEGORIES, NAV_BROKERS, NAV_IMPORT)
+        val pages = listOf(NAV_ASSETS, NAV_TRADES, NAV_DIVIDENDS, NAV_ANALYTICS, NAV_EXPORT, NAV_MORE, NAV_CATEGORIES, NAV_BROKERS, NAV_IMPORT, NAV_BIST, NAV_CRYPTO, NAV_RATES)
         pages.forEach { id ->
             val page = ScrollView(this).apply {
                 visibility = View.GONE
@@ -219,7 +232,7 @@ class MainActivity : AppCompatActivity() {
                 setPadding(0, dp(18), 0, dp(18))
                 setLineSpacing(dp(5).toFloat(), 1f)
             }
-            if (id in listOf(NAV_DIVIDENDS, NAV_EXPORT, NAV_CATEGORIES, NAV_BROKERS, NAV_IMPORT)) {
+            if (id in listOf(NAV_DIVIDENDS, NAV_EXPORT, NAV_CATEGORIES, NAV_BROKERS, NAV_IMPORT, NAV_BIST, NAV_CRYPTO, NAV_RATES)) {
                 content.addView(Button(this).apply {
                     text = "‹ Daha"
                     setOnClickListener { showPage(NAV_MORE) }
@@ -265,7 +278,7 @@ class MainActivity : AppCompatActivity() {
             if (id == NAV_IMPORT) {
                 content.addView(actionButton("Excel dosyası seç (.xlsx)", R.color.portfolio_green) { launchExcelImport() })
             }
-            if (id == NAV_ANALYTICS) {
+            if (id == NAV_BIST || id == NAV_CRYPTO) {\n                content.addView(actionButton("Varlık ekle", R.color.portfolio_green) { showAddAssetDialog() })\n            }\n            if (id == NAV_RATES) {\n                content.addView(actionButton("Kurları yenile", R.color.portfolio_green) { viewModel.refreshRates() })\n                val rates = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }\n                content.addView(rates)\n                ratesContainer = rates\n            }\n            if (id == NAV_ANALYTICS) {
                 val chartColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 content.addView(chartColumn)
                 analyticsContainer = chartColumn
@@ -314,7 +327,7 @@ class MainActivity : AppCompatActivity() {
     private fun showPage(id: Int) {
         dashboardView.visibility = if (id == NAV_HOME) View.VISIBLE else View.GONE
         pageViews.forEach { (pageId, view) -> view.visibility = if (pageId == id) View.VISIBLE else View.GONE }
-        val selectedNavId = if (id in listOf(NAV_DIVIDENDS, NAV_EXPORT, NAV_CATEGORIES, NAV_BROKERS, NAV_IMPORT)) NAV_MORE else id
+        val selectedNavId = if (id in listOf(NAV_DIVIDENDS, NAV_EXPORT, NAV_CATEGORIES, NAV_BROKERS, NAV_IMPORT, NAV_BIST, NAV_CRYPTO, NAV_RATES)) NAV_MORE else id
         bottomNavigation.menu.findItem(selectedNavId)?.isChecked = true
         binding.fabAddAsset.visibility = View.GONE
         updatePageContent()
@@ -468,7 +481,7 @@ class MainActivity : AppCompatActivity() {
         NAV_MORE -> "Diğer sayfalar"
         NAV_CATEGORIES -> "Kategori dağılımı"
         NAV_BROKERS -> "Aracı kurum dağılımı"
-        NAV_IMPORT -> "Excel içe aktarma"
+        NAV_IMPORT -> "Excel içe aktarma"\n        NAV_BIST -> "Borsa • BIST ve ABD"\n        NAV_CRYPTO -> "Kripto varlıklar"\n        NAV_RATES -> "Güncel kurlar"
         else -> "Raporlar ve dışa aktarma"
     }
 
@@ -488,7 +501,7 @@ class MainActivity : AppCompatActivity() {
         }
 
     private fun categoryLabel(value: String) = when (value.uppercase(Locale.ROOT)) {
-        "STOCK", "BIST", "HISSE" -> "Hisse"
+        "STOCK", "BIST", "HISSE" -> "Hisse (BIST)"\n        "US_STOCK" -> "Amerikan Borsaları"
         "FUND" -> "Yatırım Fonu"
         "CRYPTO" -> "Kripto"
         "FX" -> "Döviz"
@@ -519,8 +532,8 @@ class MainActivity : AppCompatActivity() {
             this, android.R.layout.simple_spinner_dropdown_item,
             currentAssets.map { "${it.ticker} — ${it.name}" }
         )
-        val categoryCodes = listOf("STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
-        val categoryLabels = listOf("Hisse (BIST)", "Yatırım Fonu", "Kripto Para", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Nakit", "Diğer")
+        val categoryCodes = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
+        val categoryLabels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto Para", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Nakit", "Diğer")
         val categorySpinner = android.widget.Spinner(this)
         categorySpinner.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, categoryLabels)
         val brokerNames = listOf("Belirtilmedi", "İş Yatırım", "Garanti BBVA Yatırım", "Yapı Kredi Yatırım", "Ak Yatırım", "Ziraat Yatırım", "QNB Invest", "Midas", "PhillipCapital", "A1 Capital", "Diğer")
@@ -723,8 +736,8 @@ class MainActivity : AppCompatActivity() {
         fun field(hint: String, value: String) = android.widget.EditText(this).apply { this.hint = hint; setText(value); isSingleLine = true }
         val name = field("Varlık adı", asset.name)
         val ticker = field("Sembol", asset.ticker)
-        val categories = listOf("STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
-        val labels = listOf("Hisse (BIST)", "Yatırım Fonu", "Kripto", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Nakit", "Diğer")
+        val categories = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
+        val labels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Nakit", "Diğer")
         val category = android.widget.Spinner(this).apply { adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels); setSelection(categories.indexOf(asset.category).coerceAtLeast(0)) }
         val broker = field("Aracı kurum", asset.broker)
         val hasTrades = currentTrades.any { it.assetId == asset.id }
@@ -826,6 +839,6 @@ class MainActivity : AppCompatActivity() {
         private const val NAV_MORE = 7
         private const val NAV_CATEGORIES = 8
         private const val NAV_BROKERS = 9
-        private const val NAV_IMPORT = 10
+        private const val NAV_IMPORT = 10\n        private const val NAV_BIST = 11\n        private const val NAV_CRYPTO = 12\n        private const val NAV_RATES = 13
     }
 }
