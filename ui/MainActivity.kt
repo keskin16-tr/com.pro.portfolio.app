@@ -254,12 +254,17 @@ class MainActivity : AppCompatActivity() {
             pageClockViews += pageClock
             content.addView(pageClock)
             content.addView(body)
-            if (id == NAV_ASSETS || id == NAV_TRADES) {
+            if (id == NAV_ASSETS || id == NAV_TRADES || id == NAV_BIST || id == NAV_CRYPTO) {
                 val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 content.addView(list)
                 pageLists[id] = list
             }
             if (id == NAV_MORE) {
+                content.addView(TextView(this).apply { text = "PİYASALAR"; textSize = 12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_green)); setPadding(0, dp(12), 0, dp(8)) })
+                content.addView(actionButton("Borsa • BIST ve Amerikan hisseleri", R.color.portfolio_blue) { showPage(NAV_BIST) })
+                content.addView(actionButton("Kripto varlıklar", R.color.portfolio_purple) { showPage(NAV_CRYPTO) })
+                content.addView(actionButton("Güncel kurlar • Dolar, Euro, Altın, Gümüş", R.color.portfolio_green) { showPage(NAV_RATES) })
+                content.addView(TextView(this).apply { text = "PORTFÖY ARAÇLARI"; textSize = 12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_green)); setPadding(0, dp(12), 0, dp(8)) })
                 content.addView(actionButton("Kategori dağılımı", R.color.portfolio_blue) { showPage(NAV_CATEGORIES) })
                 content.addView(actionButton("Mevcut varlıkları sınıflandır", R.color.portfolio_orange) { showClassificationDialog() })
                 content.addView(actionButton("Aracı kurumlar", R.color.portfolio_purple) { showPage(NAV_BROKERS) })
@@ -278,7 +283,15 @@ class MainActivity : AppCompatActivity() {
             if (id == NAV_IMPORT) {
                 content.addView(actionButton("Excel dosyası seç (.xlsx)", R.color.portfolio_green) { launchExcelImport() })
             }
-            if (id == NAV_BIST || id == NAV_CRYPTO) {\n                content.addView(actionButton("Varlık ekle", R.color.portfolio_green) { showAddAssetDialog() })\n            }\n            if (id == NAV_RATES) {\n                content.addView(actionButton("Kurları yenile", R.color.portfolio_green) { viewModel.refreshRates() })\n                val rates = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }\n                content.addView(rates)\n                ratesContainer = rates\n            }\n            if (id == NAV_ANALYTICS) {
+            if (id == NAV_BIST || id == NAV_CRYPTO) {
+                content.addView(actionButton("Varlık ekle", R.color.portfolio_green) { showAddAssetDialog() })
+            }
+            if (id == NAV_RATES) {
+                content.addView(actionButton("Kurları yenile", R.color.portfolio_green) { viewModel.refreshRates() })
+                val rates = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                content.addView(rates)
+                ratesContainer = rates
+            }\n            if (id == NAV_ANALYTICS) {
                 val chartColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 content.addView(chartColumn)
                 analyticsContainer = chartColumn
@@ -338,6 +351,9 @@ class MainActivity : AppCompatActivity() {
         renderAssetManagement()
         pageTexts[NAV_TRADES]?.text = ""
         renderTradeManagement()
+        renderMarketAssets(NAV_BIST)
+        renderMarketAssets(NAV_CRYPTO)
+        renderMarketRates()
         /* legacy summary text disabled: management cards provide per-record actions */
         /* pageTexts[NAV_ASSETS]?.text = if (currentAssets.isEmpty()) {
             "Henüz portföy varlığı eklenmedi."
@@ -356,11 +372,11 @@ class MainActivity : AppCompatActivity() {
                 if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit)}" else ""
         }
         */
-        pageTexts[NAV_DIVIDENDS]?.text = if (currentDividends.isEmpty()) {
+        pageTexts[NAV_DIVIDENDS]?.text = "Net temettü toplamı: " + currentDividends.groupBy { it.currency }.entries.joinToString(" • ") { (ccy, rows) -> currency(rows.sumOf { it.netAmount }, ccy) } + "\n\n" + if (currentDividends.isEmpty()) {
             "Henüz temettü kaydı bulunmuyor."
         } else currentDividends.joinToString("\n\n") { dividend ->
             val date = SimpleDateFormat("dd.MM.yyyy", Locale("tr", "TR")).format(Date(dividend.paymentDate))
-            "${dividend.ticker} • $date\nBrüt: ${currency(dividend.grossAmount)} • Stopaj: ${currency(dividend.withholdingTax)}\nNet temettü: ${currency(dividend.netAmount)}"
+            "${dividend.ticker} • $date\nBrüt: ${currency(dividend.grossAmount, dividend.currency)} • Stopaj: ${currency(dividend.withholdingTax, dividend.currency)}\nNet temettü: ${currency(dividend.netAmount, dividend.currency)}"
         }
         pageTexts[NAV_CATEGORIES]?.text = currentAssets.groupBy { it.category }.entries
             .sortedByDescending { entry -> entry.value.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
@@ -481,7 +497,10 @@ class MainActivity : AppCompatActivity() {
         NAV_MORE -> "Diğer sayfalar"
         NAV_CATEGORIES -> "Kategori dağılımı"
         NAV_BROKERS -> "Aracı kurum dağılımı"
-        NAV_IMPORT -> "Excel içe aktarma"\n        NAV_BIST -> "Borsa • BIST ve ABD"\n        NAV_CRYPTO -> "Kripto varlıklar"\n        NAV_RATES -> "Güncel kurlar"
+        NAV_IMPORT -> "Excel içe aktarma"
+        NAV_BIST -> "Borsa • BIST ve ABD"
+        NAV_CRYPTO -> "Kripto varlıklar"
+        NAV_RATES -> "Güncel kurlar"
         else -> "Raporlar ve dışa aktarma"
     }
 
@@ -501,7 +520,8 @@ class MainActivity : AppCompatActivity() {
         }
 
     private fun categoryLabel(value: String) = when (value.uppercase(Locale.ROOT)) {
-        "STOCK", "BIST", "HISSE" -> "Hisse (BIST)"\n        "US_STOCK" -> "Amerikan Borsaları"
+        "STOCK", "BIST", "HISSE" -> "Hisse (BIST)"
+        "US_STOCK" -> "Amerikan Borsaları"
         "FUND" -> "Yatırım Fonu"
         "CRYPTO" -> "Kripto"
         "FX" -> "Döviz"
