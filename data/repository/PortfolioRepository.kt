@@ -19,15 +19,15 @@ class PortfolioRepository(private val database:AppDatabase){
  val allDividends:Flow<List<DividendEntity>> = dividendDao.getAll()
  val totalNetDividends:Flow<Double> = dividendDao.totalNet()
  val allSnapshots:Flow<List<PortfolioSnapshotEntity>> = snapshotDao.getAll()
- suspend fun recordBuy(name:String,ticker:String,quantity:Double,unitPrice:Double,category:String="OTHER",currency:String="TRY",fee:Double=0.0,broker:String="Belirtilmedi"){
+ suspend fun recordBuy(name:String,ticker:String,quantity:Double,unitPrice:Double,category:String="OTHER",currency:String="TRY",fee:Double=0.0,broker:String="Belirtilmedi",priceSource:String="AUTO"){
   require(quantity>0.0&&unitPrice>=0.0&&fee>=0.0)
   database.withTransaction{
    val existing=assetDao.getAssetsOnce().firstOrNull{it.ticker.equals(ticker,ignoreCase=true)}
-   val assetId=existing?.id?:assetDao.insertAsset(AssetEntity(name=name.trim(),ticker=ticker.trim().uppercase(),quantity=0.0,costPrice=0.0,category=category,currency=currency,marketSymbol=defaultMarketSymbol(ticker,category),broker=broker))
+   val assetId=existing?.id?:assetDao.insertAsset(AssetEntity(name=name.trim(),ticker=ticker.trim().uppercase(),quantity=0.0,costPrice=0.0,category=category,currency=currency,marketSymbol=defaultMarketSymbol(ticker,category),broker=broker,lastPrice=unitPrice,priceSource=priceSource,priceUpdatedAt=System.currentTimeMillis()))
    val current=assetDao.getById(assetId)?:error("Varlık kaydı oluşturulamadı")
    val newQuantity=current.quantity+quantity
    val averageCost=(current.quantity*current.costPrice+quantity*unitPrice+fee)/newQuantity
-   tradeDao.insert(TradeEntity(assetId=assetId,action="BUY",quantity=quantity,unitPrice=unitPrice,fee=fee,note="Alış işlemi"))
+   tradeDao.insert(TradeEntity(assetId=assetId,action="BUY",quantity=quantity,unitPrice=unitPrice,fee=fee,note="Alış işlemi",currency=currency))
    assetDao.updatePosition(assetId,newQuantity,averageCost)
   }
  }
@@ -37,16 +37,17 @@ class PortfolioRepository(private val database:AppDatabase){
    val asset=assetDao.getById(assetId)?:error("Varlık bulunamadı")
    require(quantity<=asset.quantity){"Satış miktarı mevcut bakiyeden fazla olamaz."}
    val realized=(unitPrice-asset.costPrice)*quantity-fee
-   tradeDao.insert(TradeEntity(assetId=assetId,action="SELL",quantity=quantity,unitPrice=unitPrice,fee=fee,realizedProfit=realized,note="Satış işlemi"))
+   tradeDao.insert(TradeEntity(assetId=assetId,action="SELL",quantity=quantity,unitPrice=unitPrice,fee=fee,realizedProfit=realized,note="Satış işlemi",currency=asset.currency))
    assetDao.updatePosition(assetId,asset.quantity-quantity,asset.costPrice)
   }
  }
- suspend fun recordDividend(ticker:String,grossAmount:Double,taxPercent:Double=0.0,paymentDate:Long=System.currentTimeMillis(),note:String=""){
+ suspend fun recordDividend(ticker:String,grossAmount:Double,taxPercent:Double=0.0,currency:String="TRY",paymentDate:Long=System.currentTimeMillis(),note:String=""){
   require(grossAmount>0.0&&taxPercent in 0.0..100.0)
   database.withTransaction{
    val asset=assetDao.getAssetsOnce().firstOrNull{it.ticker.equals(ticker.trim(),true)}?:error("Bu sembole ait portföy varlığı bulunamadı")
    val tax=grossAmount*taxPercent/100.0
-   dividendDao.insert(DividendEntity(assetId=asset.id,ticker=asset.ticker,quantityAtPayment=asset.quantity,grossAmount=grossAmount,withholdingTax=tax,netAmount=grossAmount-tax,currency=asset.currency,exDate=paymentDate,paymentDate=paymentDate,note=note))
+   val tradeId=tradeDao.insert(TradeEntity(assetId=asset.id,action="DIVIDEND",quantity=1.0,unitPrice=grossAmount,fee=tax,executedAt=paymentDate,note=note.ifBlank{"Temettü ödemesi"},currency=currency))
+   dividendDao.insert(DividendEntity(assetId=asset.id,ticker=asset.ticker,quantityAtPayment=asset.quantity,grossAmount=grossAmount,withholdingTax=tax,netAmount=grossAmount-tax,currency=currency,exDate=paymentDate,paymentDate=paymentDate,note=note,tradeId=tradeId))
   }
  }
 
@@ -63,7 +64,7 @@ class PortfolioRepository(private val database:AppDatabase){
       name=row.name,ticker=row.ticker,quantity=row.quantity,costPrice=row.costPrice,
       category=row.category,portfolioName=row.portfolioName,currency=row.currency,
       marketSymbol=defaultMarketSymbol(row.ticker,row.category),lastPrice=row.lastPrice,
-      broker=row.broker,openingQuantity=row.quantity,openingCostPrice=row.costPrice
+      broker=row.broker,openingQuantity=row.quantity,openingCostPrice=row.costPrice,priceSource="AUTO"
      ))
      existing.add(row.ticker.uppercase())
      added++
@@ -91,26 +92,31 @@ class PortfolioRepository(private val database:AppDatabase){
   }
  }
  suspend fun editTrade(tradeId:Long,action:String,quantity:Double,unitPrice:Double,fee:Double,note:String,executedAt:Long){
-  require(action=="BUY"||action=="SELL")
+  require(action=="BUY"||action=="SELL"||action=="DIVIDEND")
   require(quantity>0.0&&unitPrice>=0.0&&fee>=0.0)
   database.withTransaction{
    val current=tradeDao.getById(tradeId)?:error("İşlem bulunamadı")
    tradeDao.update(current.copy(action=action,quantity=quantity,unitPrice=unitPrice,fee=fee,note=note,executedAt=executedAt))
-   recalculateAsset(current.assetId)
+   if(action=="DIVIDEND"){
+    require(quantity==1.0){"Temettü miktarı 1 olmalıdır."}
+    val dividend=dividendDao.getByTradeId(tradeId)
+    if(dividend!=null) dividendDao.update(dividend.copy(grossAmount=unitPrice,withholdingTax=fee,netAmount=unitPrice-fee,currency=current.currency,paymentDate=executedAt,exDate=executedAt,note=note))
+   }else recalculateAsset(current.assetId)
   }
  }
  suspend fun deleteTrade(tradeId:Long){
   database.withTransaction{
    val trade=tradeDao.getById(tradeId)?:return@withTransaction
+   dividendDao.getByTradeId(tradeId)?.let{dividendDao.delete(it)}
    tradeDao.delete(trade)
-   recalculateAsset(trade.assetId)
+   if(trade.action!="DIVIDEND") recalculateAsset(trade.assetId)
   }
  }
  private suspend fun recalculateAsset(assetId:Long){
   val asset=assetDao.getById(assetId)?:error("Varlık bulunamadı")
   var quantity=asset.openingQuantity
   var averageCost=asset.openingCostPrice
-  tradeDao.getForAssetOnce(assetId).forEach{trade->
+  tradeDao.getForAssetOnce(assetId).filter{it.action!="DIVIDEND"}.forEach{trade->
    if(trade.action=="BUY"){
     val nextQuantity=quantity+trade.quantity
     averageCost=if(nextQuantity>0.0)((quantity*averageCost)+(trade.quantity*trade.unitPrice)+trade.fee)/nextQuantity else 0.0
@@ -140,7 +146,20 @@ class PortfolioRepository(private val database:AppDatabase){
  }
  suspend fun delete(asset:AssetEntity){assetDao.deleteAsset(asset)}
  suspend fun updatePrice(assetId:Long,price:Double,updatedAt:Long=System.currentTimeMillis()){
-  if(price.isFinite()&&price>=0.0)assetDao.updatePrice(assetId,price,updatedAt)
+  if(price.isFinite()&&price>=0.0){
+   assetDao.updatePrice(assetId,price,updatedAt)
+   val asset=assetDao.getById(assetId)?:return
+   val calendar=Calendar.getInstance().apply{timeInMillis=updatedAt;set(Calendar.HOUR_OF_DAY,0);set(Calendar.MINUTE,0);set(Calendar.SECOND,0);set(Calendar.MILLISECOND,0)}
+   database.assetPriceSnapshotDao().upsert(com.portfolio.app.data.local.AssetPriceSnapshotEntity(assetId,calendar.timeInMillis,price,asset.currency))
+  }
+ }
+ suspend fun dailyProfitLoss(currency:String):Double{
+  val assets=assetDao.getAssetsOnce().filter{it.currency.equals(currency,true)&&it.quantity>0.0}
+  val today=Calendar.getInstance().apply{set(Calendar.HOUR_OF_DAY,0);set(Calendar.MINUTE,0);set(Calendar.SECOND,0);set(Calendar.MILLISECOND,0)}.timeInMillis
+  return assets.sumOf{asset->
+   val previous=database.assetPriceSnapshotDao().previousForAsset(asset.id,today)
+   if(previous==null) 0.0 else ((asset.lastPrice?:asset.costPrice)-previous.price)*asset.quantity
+  }
  }
  private fun defaultMarketSymbol(ticker:String,category:String):String{
   val symbol=ticker.trim().uppercase()
