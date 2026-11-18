@@ -223,6 +223,7 @@ class MainActivity : AppCompatActivity() {
             content.addView(body)
             if (id == NAV_MORE) {
                 content.addView(actionButton("Kategori dağılımı", R.color.portfolio_blue) { showPage(NAV_CATEGORIES) })
+                content.addView(actionButton("Mevcut varlıkları sınıflandır", R.color.portfolio_orange) { showClassificationDialog() })
                 content.addView(actionButton("Aracı kurumlar", R.color.portfolio_purple) { showPage(NAV_BROKERS) })
                 content.addView(actionButton("Temettü kayıtları", R.color.portfolio_green) { showPage(NAV_DIVIDENDS) })
                 content.addView(actionButton("Excel raporu / dışa aktar", R.color.portfolio_orange) { showPage(NAV_EXPORT) })
@@ -465,6 +466,70 @@ class MainActivity : AppCompatActivity() {
         "BOND" -> "Tahvil / Bono"
         "CASH" -> "Nakit"
         else -> "Diğer"
+    }
+
+    private fun showClassificationDialog() {
+        if (currentAssets.isEmpty()) {
+            Toast.makeText(this, "Önce portföye varlık ekleyin.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), 0)
+        }
+        fun label(text: String) = TextView(this).apply {
+            this.text = text
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            textSize = 12f
+            setPadding(0, dp(8), 0, dp(4))
+        }
+        val assetSpinner = android.widget.Spinner(this)
+        assetSpinner.adapter = android.widget.ArrayAdapter(
+            this, android.R.layout.simple_spinner_dropdown_item,
+            currentAssets.map { "${it.ticker} — ${it.name}" }
+        )
+        val categoryCodes = listOf("STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
+        val categoryLabels = listOf("Hisse (BIST)", "Yatırım Fonu", "Kripto Para", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Nakit", "Diğer")
+        val categorySpinner = android.widget.Spinner(this)
+        categorySpinner.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, categoryLabels)
+        val brokerNames = listOf("Belirtilmedi", "İş Yatırım", "Garanti BBVA Yatırım", "Yapı Kredi Yatırım", "Ak Yatırım", "Ziraat Yatırım", "QNB Invest", "Midas", "PhillipCapital", "A1 Capital", "Diğer")
+        val brokerSpinner = android.widget.Spinner(this)
+        brokerSpinner.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, brokerNames)
+        val customBroker = android.widget.EditText(this).apply { hint = "Diğer aracı kurum adı" }
+        box.addView(label("Varlık"))
+        box.addView(assetSpinner)
+        box.addView(label("Kategori"))
+        box.addView(categorySpinner)
+        box.addView(label("Aracı kurum"))
+        box.addView(brokerSpinner)
+        box.addView(customBroker)
+        fun syncSelection() {
+            val selected = currentAssets[assetSpinner.selectedItemPosition.coerceIn(0, currentAssets.lastIndex)]
+            categorySpinner.setSelection(categoryCodes.indexOf(selected.category).coerceAtLeast(0))
+            val brokerIndex = brokerNames.indexOf(selected.broker)
+            brokerSpinner.setSelection(if (brokerIndex >= 0) brokerIndex else brokerNames.lastIndex)
+            customBroker.setText(if (brokerIndex < 0) selected.broker else "")
+        }
+        assetSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) = syncSelection()
+        }
+        syncSelection()
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Varlık sınıflandırma")
+            .setView(box)
+            .setNegativeButton("İptal", null)
+            .setPositiveButton("Kaydet") { _, _ ->
+                val asset = currentAssets[assetSpinner.selectedItemPosition.coerceIn(0, currentAssets.lastIndex)]
+                val brokerChoice = brokerNames[brokerSpinner.selectedItemPosition.coerceIn(0, brokerNames.lastIndex)]
+                val broker = if (brokerChoice == "Diğer") customBroker.text.toString().trim().ifBlank { "Belirtilmedi" } else brokerChoice
+                viewModel.classifyAsset(asset.id, categoryCodes[categorySpinner.selectedItemPosition], broker) { result ->
+                    runOnUiThread {
+                        result.onSuccess { Toast.makeText(this, "Kategori ve aracı kurum güncellendi.", Toast.LENGTH_LONG).show() }
+                            .onFailure { Toast.makeText(this, "Güncelleme başarısız: ${it.message}", Toast.LENGTH_LONG).show() }
+                    }
+                }
+            }.show()
     }
 
     private fun showSellDialog() {
