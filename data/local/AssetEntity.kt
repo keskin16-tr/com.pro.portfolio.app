@@ -8,5 +8,7 @@ data class AssetEntity(
  val name:String,val ticker:String,val quantity:Double,val costPrice:Double,
  val category:String="OTHER",val portfolioName:String="Ana Portföy",
  val currency:String="TRY",val marketSymbol:String="",val lastPrice:Double?=null,val priceUpdatedAt:Long?=null,
- @ColumnInfo(defaultValue="'Belirtilmedi'") val broker:String="Belirtilmedi"
+ @ColumnInfo(defaultValue="'Belirtilmedi'") val broker:String="Belirtilmedi",
+ @ColumnInfo(defaultValue="0.0") val openingQuantity:Double=0.0,
+ @ColumnInfo(defaultValue="0.0") val openingCostPrice:Double=0.0
 )
