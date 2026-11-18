@@ -11,8 +11,8 @@ android {
         applicationId = "com.portfolio.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0.0"
+        versionCode = 7
+        versionName = "3.9.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     sourceSets {

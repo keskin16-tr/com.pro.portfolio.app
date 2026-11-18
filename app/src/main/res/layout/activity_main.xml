@@ -61,6 +61,113 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
+            <TextView
+                android:id="@+id/tvCurrentDateTime"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Tarih ve saat yükleniyor..."
+                android:textColor="@color/portfolio_muted"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopAddAsset"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="Varlık ekle"
+                    android:textColor="@color/portfolio_navy"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_green"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_input_add"
+                    app:iconTint="@color/portfolio_navy" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopSell"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Satış yap"
+                    android:textColor="@color/portfolio_navy"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_orange"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_menu_send"
+                    app:iconTint="@color/portfolio_navy" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopImportExcel"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="Excel içe aktar"
+                    android:textColor="@color/portfolio_navy"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_blue"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_menu_send"
+                    app:iconTint="@color/portfolio_navy" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopAddDividend"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Temettü ekle"
+                    android:textColor="@color/portfolio_navy"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_purple"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_menu_my_calendar"
+                    app:iconTint="@color/portfolio_navy" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopManageAssets"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="Varlıkları düzenle"
+                    android:textColor="@color/portfolio_text"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_surface_alt"
+                    app:strokeColor="@color/portfolio_blue"
+                    app:strokeWidth="1dp"
+                    app:cornerRadius="12dp" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopManageTrades"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="İşlemleri düzenle"
+                    android:textColor="@color/portfolio_text"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_surface_alt"
+                    app:strokeColor="@color/portfolio_orange"
+                    app:strokeWidth="1dp"
+                    app:cornerRadius="12dp" />
+            </LinearLayout>
+
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -123,6 +230,30 @@
                             android:textColor="@color/portfolio_muted"
                             android:textSize="11sp" />
                     </LinearLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:text="Toplam net temettü"
+                        android:textColor="@color/portfolio_muted"
+                        android:textSize="12sp" />
+                    <TextView
+                        android:id="@+id/tvDividendTotal"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="₺0,00"
+                        android:textColor="@color/portfolio_green"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnAddDividend"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="Temettü kaydı ekle"
+                        android:textColor="@color/portfolio_navy"
+                        app:backgroundTint="@color/portfolio_green" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -174,6 +305,37 @@
                         android:textSize="13sp" />
                 </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSellAsset"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Varlık satışı yap"
+                android:textColor="@color/portfolio_text"
+                app:backgroundTint="@color/portfolio_surface"
+                app:strokeColor="@color/portfolio_green"
+                app:strokeWidth="1dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="26dp"
+                android:layout_marginBottom="8dp"
+                android:text="İşlem geçmişi"
+                android:textColor="@color/portfolio_text"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvTradeHistory"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_empty"
+                android:padding="16dp"
+                android:text="Henüz işlem bulunmuyor."
+                android:textColor="@color/portfolio_muted"
+                android:textSize="13sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
