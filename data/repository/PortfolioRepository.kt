@@ -79,13 +79,15 @@ class PortfolioRepository(private val database:AppDatabase){
 
  suspend fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String,quantity:Double?=null,costPrice:Double?=null){
   require(name.isNotBlank()&&ticker.isNotBlank()&&category.isNotBlank()&&broker.isNotBlank())
-  val current=assetDao.getById(assetId)?:error("Varlık bulunamadı")
-  val cleanTicker=ticker.trim().uppercase()
-  assetDao.updateAssetDetails(assetId,name.trim(),cleanTicker,category,broker,defaultMarketSymbol(cleanTicker,category))
-  if(quantity!=null||costPrice!=null){
-   require(quantity!=null&&costPrice!=null&&quantity>=0.0&&costPrice>=0.0){"Miktar ve maliyet geçerli olmalı."}
-   require(tradeDao.getForAssetOnce(assetId).isEmpty()){"İşlem geçmişi bulunan varlıkların miktar ve maliyeti İşlemler sayfasından düzenlenmelidir."}
-   assetDao.updateOpeningPosition(assetId,quantity,costPrice)
+  database.withTransaction {
+   assetDao.getById(assetId)?:error("Varlık bulunamadı")
+   val cleanTicker=ticker.trim().uppercase()
+   if(quantity!=null||costPrice!=null){
+    require(quantity!=null&&costPrice!=null&&quantity>=0.0&&costPrice>=0.0){"Miktar ve maliyet geçerli olmalı."}
+    require(tradeDao.getForAssetOnce(assetId).isEmpty()){"İşlem geçmişi bulunan varlıkların miktar ve maliyeti İşlemler sayfasından düzenlenmelidir."}
+    assetDao.updateOpeningPosition(assetId,quantity,costPrice)
+   }
+   assetDao.updateAssetDetails(assetId,name.trim(),cleanTicker,category,broker,defaultMarketSymbol(cleanTicker,category))
   }
  }
  suspend fun editTrade(tradeId:Long,action:String,quantity:Double,unitPrice:Double,fee:Double,note:String,executedAt:Long){
