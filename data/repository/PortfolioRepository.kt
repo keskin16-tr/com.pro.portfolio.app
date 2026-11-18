@@ -76,6 +76,49 @@ class PortfolioRepository(private val database:AppDatabase){
   require(category.isNotBlank()&&broker.isNotBlank())
   assetDao.updateClassification(assetId,category,broker)
  }
+
+ suspend fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String){
+  require(name.isNotBlank()&&ticker.isNotBlank()&&category.isNotBlank()&&broker.isNotBlank())
+  val current=assetDao.getById(assetId)?:error("Varlık bulunamadı")
+  val cleanTicker=ticker.trim().uppercase()
+  assetDao.updateAssetDetails(assetId,name.trim(),cleanTicker,category,broker,defaultMarketSymbol(cleanTicker,category))
+ }
+ suspend fun editTrade(tradeId:Long,action:String,quantity:Double,unitPrice:Double,fee:Double,note:String){
+  require(action=="BUY"||action=="SELL")
+  require(quantity>0.0&&unitPrice>=0.0&&fee>=0.0)
+  database.withTransaction{
+   val current=tradeDao.getById(tradeId)?:error("İşlem bulunamadı")
+   tradeDao.update(current.copy(action=action,quantity=quantity,unitPrice=unitPrice,fee=fee,note=note))
+   recalculateAsset(current.assetId)
+  }
+ }
+ suspend fun deleteTrade(tradeId:Long){
+  database.withTransaction{
+   val trade=tradeDao.getById(tradeId)?:return@withTransaction
+   tradeDao.delete(trade)
+   recalculateAsset(trade.assetId)
+  }
+ }
+ private suspend fun recalculateAsset(assetId:Long){
+  val asset=assetDao.getById(assetId)?:error("Varlık bulunamadı")
+  var quantity=0.0
+  var averageCost=0.0
+  tradeDao.getForAssetOnce(assetId).forEach{trade->
+   if(trade.action=="BUY"){
+    val nextQuantity=quantity+trade.quantity
+    averageCost=if(nextQuantity>0.0)((quantity*averageCost)+(trade.quantity*trade.unitPrice)+trade.fee)/nextQuantity else 0.0
+    quantity=nextQuantity
+    if(trade.realizedProfit!=0.0) tradeDao.update(trade.copy(realizedProfit=0.0))
+   }else{
+    require(trade.quantity<=quantity+1e-8){"Bu işlem düzenlemesi, önceki alışlardan fazla satış oluşturuyor. İşlem geri alındı."}
+    val realized=(trade.unitPrice-averageCost)*trade.quantity-trade.fee
+    quantity=(quantity-trade.quantity).coerceAtLeast(0.0)
+    tradeDao.update(trade.copy(realizedProfit=realized))
+    if(quantity==0.0) averageCost=0.0
+   }
+  }
+  assetDao.updatePosition(assetId,quantity,averageCost)
+ }
  suspend fun recordDailySnapshot(){
   val assets=assetDao.getAssetsOnce()
   if(assets.isEmpty()) return
