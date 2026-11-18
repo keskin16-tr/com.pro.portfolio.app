@@ -8,9 +8,10 @@ import android.view.View
 import androidx.core.content.ContextCompat
 import com.portfolio.app.R
 import kotlin.math.max
+import java.util.Locale
 
 class AnalyticsChartView(context: Context) : View(context) {
-    enum class ChartType { BAR, DONUT }
+    enum class ChartType { BAR, DONUT, LINE }
     var chartType: ChartType = ChartType.BAR
         set(value) { field = value; invalidate() }
     var chartValues: List<Double> = emptyList()
@@ -32,7 +33,7 @@ class AnalyticsChartView(context: Context) : View(context) {
             canvas.drawText("Henüz grafik verisi yok", 16f, height / 2f, labelPaint)
             return
         }
-        if (chartType == ChartType.DONUT) drawDonut(canvas) else drawBars(canvas)
+        when (chartType) { ChartType.DONUT -> drawDonut(canvas); ChartType.LINE -> drawLineChart(canvas); ChartType.BAR -> drawBars(canvas) }
     }
 
     private fun drawDonut(canvas: Canvas) {
@@ -69,6 +70,48 @@ class AnalyticsChartView(context: Context) : View(context) {
             canvas.drawText(chartLabels.getOrNull(index).orEmpty().take(12), legendX + 12f, y + 4f, labelPaint)
             canvas.drawText("${(value / total * 100).toInt()}%", legendX + 90f, y + 4f, labelPaint)
         }
+    }
+
+
+    private fun drawLineChart(canvas: Canvas) {
+        if (chartValues.isEmpty()) return
+        val left = 34f * resources.displayMetrics.density
+        val right = width - 12f
+        val top = 18f * resources.displayMetrics.density
+        val bottom = height - 34f * resources.displayMetrics.density
+        val minValue = chartValues.minOrNull() ?: 0.0
+        val maxValue = chartValues.maxOrNull() ?: 1.0
+        val range = (maxValue - minValue).coerceAtLeast(1.0)
+        paint.color = 0xFF34465F.toInt()
+        paint.strokeWidth = resources.displayMetrics.density
+        for (i in 0..3) {
+            val y = top + (bottom - top) * i / 3f
+            canvas.drawLine(left, y, right, y, paint)
+        }
+        val points = chartValues.mapIndexed { index, value ->
+            val x = if (chartValues.size == 1) (left + right) / 2f
+                    else left + (right - left) * index / (chartValues.size - 1).toFloat()
+            val y = bottom - ((value - minValue) / range).toFloat() * (bottom - top)
+            x to y
+        }
+        paint.color = 0xFF31D0AA.toInt()
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2.5f * resources.displayMetrics.density
+        for (i in 0 until points.lastIndex) {
+            canvas.drawLine(points[i].first, points[i].second, points[i + 1].first, points[i + 1].second, paint)
+        }
+        paint.style = Paint.Style.FILL
+        points.forEach { (x, y) -> canvas.drawCircle(x, y, 4f * resources.displayMetrics.density, paint) }
+        labelPaint.textAlign = Paint.Align.CENTER
+        if (chartLabels.isNotEmpty()) {
+            canvas.drawText(chartLabels.first(), left, height - 8f, labelPaint)
+            if (chartLabels.size > 1) canvas.drawText(chartLabels.last(), right, height - 8f, labelPaint)
+        }
+        labelPaint.textAlign = Paint.Align.LEFT
+        paint.textSize = 10f * resources.displayMetrics.scaledDensity
+        paint.color = ContextCompat.getColor(context, R.color.portfolio_muted)
+        canvas.drawText(String.format(Locale("tr", "TR"), "%.0f", maxValue), 2f, top + 4f, paint)
+        canvas.drawText(String.format(Locale("tr", "TR"), "%.0f", minValue), 2f, bottom, paint)
     }
 
     private fun drawBars(canvas: Canvas) {
