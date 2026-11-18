@@ -63,7 +63,7 @@ class PortfolioRepository(private val database:AppDatabase){
       name=row.name,ticker=row.ticker,quantity=row.quantity,costPrice=row.costPrice,
       category=row.category,portfolioName=row.portfolioName,currency=row.currency,
       marketSymbol=defaultMarketSymbol(row.ticker,row.category),lastPrice=row.lastPrice,
-      broker=row.broker
+      broker=row.broker,openingQuantity=row.quantity,openingCostPrice=row.costPrice
      ))
      existing.add(row.ticker.uppercase())
      added++
@@ -101,8 +101,8 @@ class PortfolioRepository(private val database:AppDatabase){
  }
  private suspend fun recalculateAsset(assetId:Long){
   val asset=assetDao.getById(assetId)?:error("Varlık bulunamadı")
-  var quantity=0.0
-  var averageCost=0.0
+  var quantity=asset.openingQuantity
+  var averageCost=asset.openingCostPrice
   tradeDao.getForAssetOnce(assetId).forEach{trade->
    if(trade.action=="BUY"){
     val nextQuantity=quantity+trade.quantity
