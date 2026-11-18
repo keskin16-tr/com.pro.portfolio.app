@@ -737,7 +737,7 @@ class MainActivity : AppCompatActivity() {
                 textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(10), 0, 0)
             })
         } else {
-            box.addView(quantity); box.addView(cost)
+            quantity?.let { box.addView(it) }; cost?.let { box.addView(it) }
         }
         androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Varlığı düzenle").setView(box)
             .setNegativeButton("İptal", null).setPositiveButton("Kaydet") { _, _ ->
