@@ -128,7 +128,7 @@ class MainActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.dividends.collect { currentDividends = it; updatePageContent() }
+                viewModel.dividends.collect { currentDividends = it; updateSummary(); updatePageContent() }
             }
         }
         lifecycleScope.launch {
