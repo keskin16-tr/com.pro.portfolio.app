@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var assetAdapter: AssetAdapter
     private lateinit var dashboardView: View
     private lateinit var bottomNavigation: BottomNavigationView
+    private var analyticsContainer: LinearLayout? = null
     private val pageViews = mutableMapOf<Int, View>()
     private val pageTexts = mutableMapOf<Int, TextView>()
     private var currentAssets: List<AssetEntity> = emptyList()
@@ -106,7 +107,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupNavigation() {
         val root = binding.root
-        val pages = listOf(NAV_ASSETS, NAV_TRADES, NAV_DIVIDENDS, NAV_EXPORT)
+        val pages = listOf(NAV_ASSETS, NAV_TRADES, NAV_DIVIDENDS, NAV_ANALYTICS, NAV_EXPORT)
         pages.forEach { id ->
             val page = ScrollView(this).apply {
                 visibility = View.GONE
@@ -130,6 +131,11 @@ class MainActivity : AppCompatActivity() {
             }
             content.addView(title)
             content.addView(body)
+            if (id == NAV_ANALYTICS) {
+                val chartColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                content.addView(chartColumn)
+                analyticsContainer = chartColumn
+            }
             if (id == NAV_EXPORT) {
                 val exportButton = Button(this).apply {
                     text = "Excel dosyasını oluştur (.xlsx)"
@@ -159,7 +165,8 @@ class MainActivity : AppCompatActivity() {
             menu.add(0, NAV_ASSETS, 1, "Portföy").setIcon(android.R.drawable.ic_menu_agenda)
             menu.add(0, NAV_TRADES, 2, "İşlemler").setIcon(android.R.drawable.ic_menu_sort_by_size)
             menu.add(0, NAV_DIVIDENDS, 3, "Temettü").setIcon(android.R.drawable.ic_menu_my_calendar)
-            menu.add(0, NAV_EXPORT, 4, "Rapor").setIcon(android.R.drawable.ic_menu_save)
+            menu.add(0, NAV_ANALYTICS, 4, "Analiz").setIcon(android.R.drawable.ic_menu_gallery)
+            menu.add(0, NAV_EXPORT, 5, "Rapor").setIcon(android.R.drawable.ic_menu_save)
             setOnItemSelectedListener { item ->
                 showPage(item.itemId)
                 true
@@ -202,6 +209,7 @@ class MainActivity : AppCompatActivity() {
             val date = SimpleDateFormat("dd.MM.yyyy", Locale("tr", "TR")).format(Date(d.paymentDate))
             "${d.ticker} • $date\nBrüt: ${currency(d.grossAmount)}   Stopaj: ${currency(d.withholdingTax)}\nNet temettü: ${currency(d.netAmount)}"
         }
+        renderAnalytics()
         pageTexts[NAV_EXPORT]?.text =
             "Rapor dosyası Android'in dosya kaydetme penceresiyle seçtiğiniz konuma kaydedilir.\n\nExcel çalışma kitabı:\n• Portföy: adet, ortalama maliyet, son fiyat, piyasa değeri ve kâr/zarar\n• İşlemler: alış/satış, komisyon ve gerçekleşen kâr/zarar\n• Temettüler: brüt, stopaj ve net tutar\n\nKayıtlar cihazınızdaki yerel veritabanından alınır; internet gerekmez."
     }
@@ -222,6 +230,7 @@ class MainActivity : AppCompatActivity() {
         NAV_ASSETS -> "Portföyüm"
         NAV_TRADES -> "İşlem geçmişi"
         NAV_DIVIDENDS -> "Temettüler"
+        NAV_ANALYTICS -> "Portföy analizi"
         else -> "Raporlar ve dışa aktarma"
     }
 
@@ -319,6 +328,7 @@ class MainActivity : AppCompatActivity() {
         private const val NAV_ASSETS = 2
         private const val NAV_TRADES = 3
         private const val NAV_DIVIDENDS = 4
-        private const val NAV_EXPORT = 5
+        private const val NAV_ANALYTICS = 5
+        private const val NAV_EXPORT = 6
     }
 }
