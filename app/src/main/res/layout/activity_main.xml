@@ -100,7 +100,7 @@
                     android:textStyle="bold"
                     app:backgroundTint="@color/portfolio_orange"
                     app:cornerRadius="14dp"
-                    app:icon="@android:drawable/ic_menu_upload"
+                    app:icon="@android:drawable/ic_menu_send"
                     app:iconTint="@color/portfolio_navy" />
             </LinearLayout>
             <LinearLayout
@@ -119,7 +119,7 @@
                     android:textStyle="bold"
                     app:backgroundTint="@color/portfolio_blue"
                     app:cornerRadius="14dp"
-                    app:icon="@android:drawable/ic_menu_upload"
+                    app:icon="@android:drawable/ic_menu_send"
                     app:iconTint="@color/portfolio_navy" />
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnTopAddDividend"
