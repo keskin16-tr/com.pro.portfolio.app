@@ -99,6 +99,28 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN currency TEXT NOT NULL DEFAULT 'TRY'")
                 db.execSQL("UPDATE transactions SET currency = COALESCE((SELECT currency FROM assets WHERE assets.id = transactions.assetId), 'TRY')")
                 db.execSQL("ALTER TABLE dividends ADD COLUMN tradeId INTEGER")
+                db.query("SELECT id, assetId, grossAmount, withholdingTax, currency, paymentDate, note FROM dividends").use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val dividendId = cursor.getLong(0)
+                        val assetId = cursor.getLong(1)
+                        val gross = cursor.getDouble(2)
+                        val tax = cursor.getDouble(3)
+                        val currency = cursor.getString(4) ?: "TRY"
+                        val paymentDate = cursor.getLong(5)
+                        val note = cursor.getString(6) ?: "Temettü ödemesi"
+                        val statement = db.compileStatement(
+                            "INSERT INTO transactions (assetId, action, quantity, unitPrice, fee, realizedProfit, executedAt, note, currency) VALUES (?, 'DIVIDEND', 1.0, ?, ?, 0.0, ?, ?, ?)"
+                        )
+                        statement.bindLong(1, assetId)
+                        statement.bindDouble(2, gross)
+                        statement.bindDouble(3, tax)
+                        statement.bindLong(4, paymentDate)
+                        statement.bindString(5, note)
+                        statement.bindString(6, currency)
+                        val tradeId = statement.executeInsert()
+                        db.execSQL("UPDATE dividends SET tradeId = ? WHERE id = ?", arrayOf(tradeId, dividendId))
+                    }
+                }
                 db.execSQL("""CREATE TABLE IF NOT EXISTS asset_price_snapshots (
                     assetId INTEGER NOT NULL,
                     snapshotDate INTEGER NOT NULL,
