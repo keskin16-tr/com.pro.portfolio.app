@@ -552,7 +552,7 @@ class MainActivity : AppCompatActivity() {
                     setPadding(0, dp(18), 0, dp(4))
                 })
                 val market = group.map { it.quantity * (it.lastPrice ?: it.costPrice) }
-                val unrealized = group.map { (it.lastPrice ?: it.costPrice - it.costPrice) * it.quantity }
+                val unrealized = group.map { ((it.lastPrice ?: it.costPrice) - it.costPrice) * it.quantity }
                 addChart("Varlık dağılımı", "Güncel piyasa değerine göre • $code", com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.DONUT, market, group.map { it.ticker })
                 addChart("Gerçekleşmemiş kâr / zarar", "Ortalama maliyet ile son fiyat farkı • $code", com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, unrealized, group.map { it.ticker })
                 val realized = currentTrades.filter { it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
