@@ -17,4 +17,6 @@ interface AssetDao {
  @Query("UPDATE assets SET category=:category, broker=:broker WHERE id=:assetId") suspend fun updateClassification(assetId:Long,category:String,broker:String)
  @Query("UPDATE assets SET name=:name, ticker=:ticker, category=:category, broker=:broker, marketSymbol=:marketSymbol WHERE id=:assetId")
  suspend fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String,marketSymbol:String)
+ @Query("UPDATE assets SET quantity=:quantity, costPrice=:costPrice, openingQuantity=:quantity, openingCostPrice=:costPrice WHERE id=:assetId")
+ suspend fun updateOpeningPosition(assetId:Long,quantity:Double,costPrice:Double)
 }
