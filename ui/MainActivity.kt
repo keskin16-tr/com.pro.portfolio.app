@@ -216,7 +216,7 @@ class MainActivity : AppCompatActivity() {
                 setPadding(0, dp(18), 0, dp(18))
                 setLineSpacing(dp(5).toFloat(), 1f)
             }
-            if (id == NAV_DIVIDENDS || id == NAV_EXPORT) {
+            if (id in listOf(NAV_DIVIDENDS, NAV_EXPORT, NAV_CATEGORIES, NAV_BROKERS, NAV_IMPORT)) {
                 content.addView(Button(this).apply {
                     text = "‹ Daha"
                     setOnClickListener { showPage(NAV_MORE) }
@@ -340,7 +340,7 @@ class MainActivity : AppCompatActivity() {
                 "$broker • ${assets.size} varlık\nToplam değer: ${currency(assets.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) })}"
             }.ifBlank { "Aracı kurum dağılımı için portföye varlık ekleyin." }
         pageTexts[NAV_IMPORT]?.text =
-            "Excel (.xlsx) dosyasının ilk sayfasında Sembol, Varlık, Kategori, Adet ve Ortalama Maliyet sütunları bulunmalı.\n\nPortfolio Pro dışa aktarma dosyaları doğrudan içe aktarılabilir. Aynı sembol portföyde zaten varsa tekrar eklenmez. İçe aktarma öncesi önizleme gösterilir."
+            "Excel (.xlsx) dosyasının ilk sayfasında Sembol, Varlık, Kategori, Adet ve Ortalama Maliyet sütunları bulunmalı.\n\nBu işlem mevcut portföy varlıklarını içe aktarır; işlem ve temettü geçmişini içe aktarmaz. Portfolio Pro dışa aktarma dosyaları doğrudan kullanılabilir. Aynı sembol varsa tekrar eklenmez. Önizleme onayından sonra yeni kayıtlar eklenir."
         pageTexts[NAV_MORE]?.text =
             "Kategori ve aracı kurum dağılımlarını inceleyin; temettü kayıtlarına ulaşın veya Excel dosyalarını içe/dışa aktarın."
         pageTexts[NAV_EXPORT]?.text =
