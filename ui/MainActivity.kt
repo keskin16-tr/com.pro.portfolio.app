@@ -2,6 +2,10 @@ package com.portfolio.app.ui.main
 
 import android.content.Intent
 import android.graphics.Typeface
+import android.graphics.Color
+import android.content.res.ColorStateList
+import android.os.Handler
+import android.os.Looper
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
@@ -11,6 +15,10 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.google.android.material.button.MaterialButton
+import com.portfolio.app.data.importer.ExcelImporter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -50,10 +58,23 @@ class MainActivity : AppCompatActivity() {
     private var currentTrades: List<TradeEntity> = emptyList()
     private var currentDividends: List<DividendEntity> = emptyList()
     private var currentSnapshots: List<PortfolioSnapshotEntity> = emptyList()
+    private val clockHandler = Handler(Looper.getMainLooper())
+    private val clockUpdate = object : Runnable {
+        override fun run() {
+            if (::binding.isInitialized) {
+                binding.tvCurrentDateTime.text = SimpleDateFormat("EEEE, dd MMMM yyyy • HH:mm:ss", Locale("tr", "TR")).format(Date())
+                clockHandler.postDelayed(this, 1_000L)
+            }
+        }
+    }
 
     private val createExcelDocument = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     ) { uri: Uri? -> writeExcel(uri) }
+
+    private val importExcelDocument = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? -> uri?.let(::importExcel) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,13 +84,13 @@ class MainActivity : AppCompatActivity() {
         setupRecyclerView()
         setupNavigation()
 
-        binding.fabAddAsset.setOnClickListener {
-            AddAssetDialogFragment { name, ticker, quantity, costPrice ->
-                viewModel.addAsset(name, ticker, quantity, costPrice)
-            }.show(supportFragmentManager, "AddAssetDialog")
-        }
-        binding.btnAddDividend.setOnClickListener { showDividendDialog() }
-        binding.btnSellAsset.setOnClickListener { showSellDialog() }
+        binding.fabAddAsset.visibility = View.GONE
+        binding.btnSellAsset.visibility = View.GONE
+        binding.btnAddDividend.visibility = View.GONE
+        binding.btnTopAddAsset.setOnClickListener { showAddAssetDialog() }
+        binding.btnTopSell.setOnClickListener { showSellDialog() }
+        binding.btnTopImportExcel.setOnClickListener { launchExcelImport() }
+        binding.btnTopAddDividend.setOnClickListener { showDividendDialog() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -112,9 +133,65 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        clockHandler.removeCallbacks(clockUpdate)
+        clockUpdate.run()
+    }
+
+    override fun onStop() {
+        clockHandler.removeCallbacks(clockUpdate)
+        super.onStop()
+    }
+
+    private fun showAddAssetDialog() {
+        AddAssetDialogFragment { name, ticker, quantity, costPrice, category, broker ->
+            viewModel.addAsset(name, ticker, quantity, costPrice, category, broker)
+        }.show(supportFragmentManager, "AddAssetDialog")
+    }
+
+    private fun launchExcelImport() {
+        importExcelDocument.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+    }
+
+    private fun importExcel(uri: Uri) {
+        lifecycleScope.launch {
+            try {
+                val rows = withContext(Dispatchers.IO) {
+                    contentResolver.openInputStream(uri)?.use { ExcelImporter.readHoldings(it) }
+                        ?: error("Excel dosyası açılamadı.")
+                }
+                if (rows.isEmpty()) {
+                    Toast.makeText(this@MainActivity, "İçe aktarılabilecek geçerli varlık bulunamadı.", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+                val preview = rows.take(12).joinToString("\n") {
+                    "${it.ticker} • ${formatNumber(it.quantity)} adet • ${currency(it.costPrice)} • ${it.broker}"
+                } + if (rows.size > 12) "\n… ve ${rows.size - 12} kayıt daha" else ""
+                androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Excel içe aktarma önizlemesi")
+                    .setMessage("${rows.size} geçerli varlık bulundu. Mevcut semboller tekrar eklenmeyecek.\n\n$preview")
+                    .setNegativeButton("Vazgeç", null)
+                    .setPositiveButton("İçe aktar") { _, _ ->
+                        viewModel.importHoldings(rows) { result ->
+                            runOnUiThread {
+                                result.onSuccess { (added, skipped) ->
+                                    Toast.makeText(this@MainActivity, "$added varlık eklendi, $skipped tekrar eden sembol atlandı.", Toast.LENGTH_LONG).show()
+                                }.onFailure {
+                                    Toast.makeText(this@MainActivity, "İçe aktarma başarısız: ${it.message}", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }.show()
+            } catch (error: Exception) {
+                Toast.makeText(this@MainActivity, "Excel okunamadı: ${error.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     private fun setupNavigation() {
         val root = binding.root
-        val pages = listOf(NAV_ASSETS, NAV_TRADES, NAV_DIVIDENDS, NAV_ANALYTICS, NAV_EXPORT, NAV_MORE)
+        val pages = listOf(NAV_ASSETS, NAV_TRADES, NAV_DIVIDENDS, NAV_ANALYTICS, NAV_EXPORT, NAV_MORE, NAV_CATEGORIES, NAV_BROKERS, NAV_IMPORT)
         pages.forEach { id ->
             val page = ScrollView(this).apply {
                 visibility = View.GONE
@@ -145,14 +222,22 @@ class MainActivity : AppCompatActivity() {
             content.addView(title)
             content.addView(body)
             if (id == NAV_MORE) {
-                content.addView(Button(this).apply {
-                    text = "Temettü kayıtları"
-                    setOnClickListener { showPage(NAV_DIVIDENDS) }
+                content.addView(actionButton("Kategori dağılımı", R.color.portfolio_blue) { showPage(NAV_CATEGORIES) })
+                content.addView(actionButton("Aracı kurumlar", R.color.portfolio_purple) { showPage(NAV_BROKERS) })
+                content.addView(actionButton("Temettü kayıtları", R.color.portfolio_green) { showPage(NAV_DIVIDENDS) })
+                content.addView(actionButton("Excel raporu / dışa aktar", R.color.portfolio_orange) { showPage(NAV_EXPORT) })
+                content.addView(actionButton("Excel'den içe aktar", R.color.portfolio_blue) { showPage(NAV_IMPORT); launchExcelImport() })
+            }
+            if (id == NAV_CATEGORIES || id == NAV_BROKERS) {
+                content.addView(TextView(this).apply {
+                    text = "Bu özet, varlık kayıtlarındaki sınıflandırma ve aracı kurum alanlarına göre hesaplanır."
+                    textSize = 13f
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                    setPadding(0, dp(12), 0, dp(12))
                 })
-                content.addView(Button(this).apply {
-                    text = "Excel raporu oluştur"
-                    setOnClickListener { showPage(NAV_EXPORT) }
-                })
+            }
+            if (id == NAV_IMPORT) {
+                content.addView(actionButton("Excel dosyası seç (.xlsx)", R.color.portfolio_green) { launchExcelImport() })
             }
             if (id == NAV_ANALYTICS) {
                 val chartColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -160,11 +245,12 @@ class MainActivity : AppCompatActivity() {
                 analyticsContainer = chartColumn
             }
             if (id == NAV_EXPORT) {
-                val exportButton = Button(this).apply {
-                    text = "Excel dosyasını oluştur (.xlsx)"
-                    setOnClickListener { createExcelDocument.launch("PortfolioPro_Rapor.xlsx") }
-                }
-                content.addView(exportButton)
+                content.addView(actionButton("Excel dosyasını oluştur (.xlsx)", R.color.portfolio_green) {
+                    createExcelDocument.launch("PortfolioPro_Rapor.xlsx")
+                })
+                content.addView(actionButton("Excel dosyasından içe aktar", R.color.portfolio_blue) {
+                    launchExcelImport()
+                })
             }
             page.addView(content)
             root.addView(page, CoordinatorLayout.LayoutParams(
@@ -202,7 +288,7 @@ class MainActivity : AppCompatActivity() {
     private fun showPage(id: Int) {
         dashboardView.visibility = if (id == NAV_HOME) View.VISIBLE else View.GONE
         pageViews.forEach { (pageId, view) -> view.visibility = if (pageId == id) View.VISIBLE else View.GONE }
-        val selectedNavId = if (id == NAV_DIVIDENDS || id == NAV_EXPORT) NAV_MORE else id
+        val selectedNavId = if (id in listOf(NAV_DIVIDENDS, NAV_EXPORT, NAV_CATEGORIES, NAV_BROKERS, NAV_IMPORT)) NAV_MORE else id
         bottomNavigation.menu.findItem(selectedNavId)?.isChecked = true
         binding.fabAddAsset.visibility = if (id == NAV_HOME || id == NAV_ASSETS) View.VISIBLE else View.GONE
         updatePageContent()
@@ -234,8 +320,22 @@ class MainActivity : AppCompatActivity() {
         renderAnalytics()
         pageTexts[NAV_MORE]?.text =
             "Diğer çalışma alanları burada. Temettü kayıtlarını görüntüleyin veya portföyünüzü Excel çalışma kitabı olarak dışa aktarın."
+        pageTexts[NAV_CATEGORIES]?.text = currentAssets.groupBy { it.category }.entries
+            .sortedByDescending { entry -> entry.value.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
+            .joinToString("\n\n") { (category, assets) ->
+                "${categoryLabel(category)} • ${assets.size} varlık\nToplam değer: ${currency(assets.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) })}"
+            }.ifBlank { "Kategori dağılımı için portföye varlık ekleyin." }
+        pageTexts[NAV_BROKERS]?.text = currentAssets.groupBy { it.broker.ifBlank { "Belirtilmedi" } }
+            .entries.sortedByDescending { it.value.sumOf { a -> a.quantity * (a.lastPrice ?: a.costPrice) } }
+            .joinToString("\n\n") { (broker, assets) ->
+                "${broker} • ${assets.size} varlık\nToplam değer: ${currency(assets.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) })}"
+            }.ifBlank { "Aracı kurum dağılımı için portföye varlık ekleyin." }
+        pageTexts[NAV_IMPORT]?.text =
+            "Excel (.xlsx) dosyanızın ilk sayfasında Sembol, Varlık, Kategori, Adet ve Ortalama Maliyet sütunları bulunmalı.\n\nPortfolio Pro'nun dışa aktardığı dosyalar doğrudan içe aktarılabilir. Aynı sembol portföyde zaten varsa tekrar eklenmez. İçe aktarma öncesi kayıtların önizlemesi gösterilir."
+        pageTexts[NAV_MORE]?.text =
+            "Kategori ve aracı kurum dağılımlarını inceleyin; temettü kayıtlarına ulaşın veya Excel dosyalarını içe/dışa aktarın."
         pageTexts[NAV_EXPORT]?.text =
-            "Rapor dosyası Android'in dosya kaydetme penceresiyle seçtiğiniz konuma kaydedilir.\n\nExcel çalışma kitabı:\n• Portföy: adet, ortalama maliyet, son fiyat, piyasa değeri ve kâr/zarar\n• İşlemler: alış/satış, komisyon ve gerçekleşen kâr/zarar\n• Temettüler: brüt, stopaj ve net tutar\n\nKayıtlar cihazınızdaki yerel veritabanından alınır; internet gerekmez."
+            "Excel çalışma kitabı: Portföy, İşlemler ve Temettüler sayfalarını içerir. Portföy sayfasında kategori ve aracı kurum bilgileri de bulunur. Kayıtlar cihazınızdaki yerel veritabanından alınır."\n\nExcel çalışma kitabı:\n• Portföy: adet, ortalama maliyet, son fiyat, piyasa değeri ve kâr/zarar\n• İşlemler: alış/satış, komisyon ve gerçekleşen kâr/zarar\n• Temettüler: brüt, stopaj ve net tutar\n\nKayıtlar cihazınızdaki yerel veritabanından alınır; internet gerekmez."
     }
 
 
@@ -337,7 +437,37 @@ class MainActivity : AppCompatActivity() {
         NAV_DIVIDENDS -> "Temettüler"
         NAV_ANALYTICS -> "Portföy analizi"
         NAV_MORE -> "Diğer sayfalar"
+        NAV_CATEGORIES -> "Kategori dağılımı"
+        NAV_BROKERS -> "Aracı kurum dağılımı"
+        NAV_IMPORT -> "Excel içe aktarma"
         else -> "Raporlar ve dışa aktarma"
+    }
+
+    private fun actionButton(label: String, colorRes: Int, onClick: () -> Unit) =
+        MaterialButton(this).apply {
+            text = label
+            isAllCaps = false
+            textSize = 14f
+            setTextColor(Color.rgb(8, 17, 31))
+            backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, colorRes))
+            cornerRadius = dp(14)
+            minHeight = dp(52)
+            setOnClickListener { onClick() }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(54)).apply {
+                bottomMargin = dp(10)
+            }
+        }
+
+    private fun categoryLabel(value: String) = when (value.uppercase(Locale.ROOT)) {
+        "STOCK", "BIST", "HISSE" -> "Hisse"
+        "FUND" -> "Yatırım Fonu"
+        "CRYPTO" -> "Kripto"
+        "FX" -> "Döviz"
+        "GOLD" -> "Altın"
+        "COMMODITY" -> "Emtia"
+        "BOND" -> "Tahvil / Bono"
+        "CASH" -> "Nakit"
+        else -> "Diğer"
     }
 
     private fun showSellDialog() {
@@ -437,5 +567,8 @@ class MainActivity : AppCompatActivity() {
         private const val NAV_ANALYTICS = 5
         private const val NAV_EXPORT = 6
         private const val NAV_MORE = 7
+        private const val NAV_CATEGORIES = 8
+        private const val NAV_BROKERS = 9
+        private const val NAV_IMPORT = 10
     }
 }
