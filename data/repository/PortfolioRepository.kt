@@ -5,6 +5,7 @@ import com.portfolio.app.data.local.AssetEntity
 import com.portfolio.app.data.local.TradeEntity
 import com.portfolio.app.data.local.DividendEntity
 import com.portfolio.app.data.local.PortfolioSnapshotEntity
+import com.portfolio.app.data.importer.ImportedHolding
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 class PortfolioRepository(private val database:AppDatabase){
@@ -18,12 +19,13 @@ class PortfolioRepository(private val database:AppDatabase){
  val allDividends:Flow<List<DividendEntity>> = dividendDao.getAll()
  val totalNetDividends:Flow<Double> = dividendDao.totalNet()
  val allSnapshots:Flow<List<PortfolioSnapshotEntity>> = snapshotDao.getAll()
- suspend fun recordBuy(name:String,ticker:String,quantity:Double,unitPrice:Double,category:String="OTHER",currency:String="TRY",fee:Double=0.0){
+ suspend fun recordBuy(name:String,ticker:String,quantity:Double,unitPrice:Double,category:String="OTHER",currency:String="TRY",fee:Double=0.0,broker:String="Belirtilmedi"){
   require(quantity>0.0&&unitPrice>=0.0&&fee>=0.0)
   database.withTransaction{
    val existing=assetDao.getAssetsOnce().firstOrNull{it.ticker.equals(ticker,ignoreCase=true)}
-   val assetId=existing?.id?:assetDao.insertAsset(AssetEntity(name=name.trim(),ticker=ticker.trim().uppercase(),quantity=0.0,costPrice=0.0,category=category,currency=currency,marketSymbol=defaultMarketSymbol(ticker,category)))
+   val assetId=existing?.id?:assetDao.insertAsset(AssetEntity(name=name.trim(),ticker=ticker.trim().uppercase(),quantity=0.0,costPrice=0.0,category=category,currency=currency,marketSymbol=defaultMarketSymbol(ticker,category),broker=broker))
    val current=assetDao.getById(assetId)?:error("Varlık kaydı oluşturulamadı")
+   assetDao.updateClassification(assetId,category,broker)
    val newQuantity=current.quantity+quantity
    val averageCost=(current.quantity*current.costPrice+quantity*unitPrice+fee)/newQuantity
    tradeDao.insert(TradeEntity(assetId=assetId,action="BUY",quantity=quantity,unitPrice=unitPrice,fee=fee,note="Alış işlemi"))
@@ -49,6 +51,28 @@ class PortfolioRepository(private val database:AppDatabase){
   }
  }
 
+ suspend fun importHoldings(holdings:List<ImportedHolding>):Pair<Int,Int>{
+  var added=0
+  var skipped=0
+  database.withTransaction {
+   val existing=assetDao.getAssetsOnce().map{it.ticker.uppercase()}.toMutableSet()
+   holdings.forEach { row ->
+    if(row.ticker.uppercase() in existing) {
+     skipped++
+    } else {
+     assetDao.insertAsset(AssetEntity(
+      name=row.name,ticker=row.ticker,quantity=row.quantity,costPrice=row.costPrice,
+      category=row.category,portfolioName=row.portfolioName,currency=row.currency,
+      marketSymbol=defaultMarketSymbol(row.ticker,row.category),lastPrice=row.lastPrice,
+      broker=row.broker
+     ))
+     existing.add(row.ticker.uppercase())
+     added++
+    }
+   }
+  }
+  return added to skipped
+ }
  suspend fun recordDailySnapshot(){
   val assets=assetDao.getAssetsOnce()
   if(assets.isEmpty()) return
