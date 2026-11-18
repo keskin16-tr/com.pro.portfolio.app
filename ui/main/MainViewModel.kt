@@ -24,11 +24,11 @@ class MainViewModel(application:Application):AndroidViewModel(application){
  private val marketData=MarketDataRepository()
  private val marketRates=MarketRatesRepository()
  private val _rates= kotlinx.coroutines.flow.MutableStateFlow<List<MarketRate>>(emptyList())
- val rates:StateFlow<List<MarketRate>>=_rates
+ val rates:StateFlow<List<MarketRate>> = _rates
  private val _dailyPnlTry=kotlinx.coroutines.flow.MutableStateFlow<Double?>(null)
- val dailyPnlTry:StateFlow<Double?>=_dailyPnlTry
+ val dailyPnlTry:StateFlow<Double?> = _dailyPnlTry
  private val _dailyPnlUsd=kotlinx.coroutines.flow.MutableStateFlow<Double?>(null)
- val dailyPnlUsd:StateFlow<Double?>=_dailyPnlUsd
+ val dailyPnlUsd:StateFlow<Double?> = _dailyPnlUsd
  val assets:StateFlow<List<AssetEntity>> = repository.allAssets.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),emptyList())
  val trades:StateFlow<List<TradeEntity>> = repository.allTrades.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),emptyList())
  val tradeCount:StateFlow<Int> = repository.tradeCount.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),0)
