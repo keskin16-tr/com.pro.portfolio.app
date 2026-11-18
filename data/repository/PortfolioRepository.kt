@@ -102,7 +102,7 @@ class PortfolioRepository(private val database: AppDatabase) {
                         name = row.name, ticker = row.ticker, quantity = row.quantity, costPrice = row.costPrice,
                         category = row.category, portfolioName = row.portfolioName, currency = row.currency,
                         marketSymbol = defaultMarketSymbol(row.ticker, row.category), lastPrice = row.lastPrice,
-                        broker = row.broker, openingQuantity = row.quantity, openingCostPrice = row.costPrice
+                        broker = row.broker, openingQuantity = row.quantity, openingCostPrice = row.costPrice, priceSource = row.priceSource
                     ))
                     existing.add(row.ticker.uppercase())
                     added++
@@ -256,7 +256,7 @@ class PortfolioRepository(private val database: AppDatabase) {
             val previous = priceSnapshotDao.previousForAsset(asset.id, today) ?: return@mapNotNull null
             ((asset.lastPrice ?: asset.costPrice) - previous.price) * asset.quantity
         }
-        return comparable.takeIf { it.isNotEmpty() }?.sum()
+        return if (comparable.size == assets.size && comparable.isNotEmpty()) comparable.sum() else null
     }
 
     private fun defaultMarketSymbol(ticker: String, category: String): String {
