@@ -38,6 +38,6 @@ class PortfolioRepository(private val database:AppDatabase){
  }
  private fun defaultMarketSymbol(ticker:String,category:String):String{
   val symbol=ticker.trim().uppercase()
-  return if(category.uppercase() in listOf("STOCK","BIST","HISSE")&&!symbol.endsWith(".IS")) "$"+"symbol.IS" else symbol
+  return if(category.uppercase() in listOf("STOCK","BIST","HISSE")&&!symbol.endsWith(".IS")) symbol+".IS" else symbol
  }
 }
