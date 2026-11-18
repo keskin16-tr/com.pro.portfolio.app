@@ -291,7 +291,7 @@ class MainActivity : AppCompatActivity() {
         pageViews.forEach { (pageId, view) -> view.visibility = if (pageId == id) View.VISIBLE else View.GONE }
         val selectedNavId = if (id in listOf(NAV_DIVIDENDS, NAV_EXPORT, NAV_CATEGORIES, NAV_BROKERS, NAV_IMPORT)) NAV_MORE else id
         bottomNavigation.menu.findItem(selectedNavId)?.isChecked = true
-        binding.fabAddAsset.visibility = if (id == NAV_HOME || id == NAV_ASSETS) View.VISIBLE else View.GONE
+        binding.fabAddAsset.visibility = View.GONE
         updatePageContent()
     }
 
@@ -410,7 +410,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         container.addView(TextView(this).apply {
-            text = "Bilgi: Portföyün geçmiş değerlerini henüz günlük olarak kaydetmiyoruz. Bu nedenle zaman serisi ve BIST 100 karşılaştırması, geçmiş veri kaydı eklendikten sonra etkinleştirilecek."
+            text = "Bilgi: Günlük portföy geçmişi bu sürümle kaydedilir; grafik yeni kayıtlar biriktikçe uzar. Önceki tarihlere ait değerler geriye dönük oluşturulmaz."
             textSize = 12f
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
             setPadding(0, dp(14), 0, dp(24))
