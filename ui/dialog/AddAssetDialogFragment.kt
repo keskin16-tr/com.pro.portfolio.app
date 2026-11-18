@@ -20,6 +20,13 @@ class AddAssetDialogFragment(private val onSave: (String, String, Double, Double
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        binding.spinnerCategory.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (position == 1) binding.spinnerCurrency.setSelection(1)
+                else if (position == 0) binding.spinnerCurrency.setSelection(0)
+            }
+        }
         binding.btnSave.setOnClickListener {
             val name = binding.etName.text?.toString()?.trim().orEmpty()
             val ticker = binding.etTicker.text?.toString()?.trim()?.uppercase(Locale.ROOT).orEmpty()
