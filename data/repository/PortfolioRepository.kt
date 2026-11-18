@@ -28,9 +28,10 @@ class PortfolioRepository(private val database: AppDatabase) {
     suspend fun recordBuy(
         name: String, ticker: String, quantity: Double, unitPrice: Double,
         category: String = "OTHER", currency: String = "TRY", fee: Double = 0.0,
-        broker: String = "Belirtilmedi", priceSource: String = "AUTO"
+        broker: String = "Belirtilmedi", priceSource: String = "AUTO", manualPrice: Double? = null
     ) {
         require(currency.uppercase() in listOf("TRY", "USD")) { "Varlık para birimi yalnızca TRY veya USD olabilir." }
+        if (priceSource == "MANUAL") require(manualPrice != null && manualPrice >= 0.0) { "Elle giriş için güncel fiyat girin." }
         require(quantity > 0.0 && unitPrice >= 0.0 && fee >= 0.0)
         database.withTransaction {
             val existing = assetDao.getAssetsOnce().firstOrNull { it.ticker.equals(ticker, ignoreCase = true) }
@@ -38,7 +39,7 @@ class PortfolioRepository(private val database: AppDatabase) {
                 AssetEntity(
                     name = name.trim(), ticker = ticker.trim().uppercase(), quantity = 0.0, costPrice = 0.0,
                     category = category, currency = currency, marketSymbol = defaultMarketSymbol(ticker, category),
-                    broker = broker, lastPrice = unitPrice, priceUpdatedAt = System.currentTimeMillis(), priceSource = priceSource
+                    broker = broker, lastPrice = if (priceSource == "MANUAL") manualPrice else unitPrice, priceUpdatedAt = System.currentTimeMillis(), priceSource = priceSource
                 )
             )
             val current = assetDao.getById(assetId) ?: error("Varlık kaydı oluşturulamadı")
