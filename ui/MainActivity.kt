@@ -214,6 +214,72 @@ class MainActivity : AppCompatActivity() {
             "Rapor dosyası Android'in dosya kaydetme penceresiyle seçtiğiniz konuma kaydedilir.\n\nExcel çalışma kitabı:\n• Portföy: adet, ortalama maliyet, son fiyat, piyasa değeri ve kâr/zarar\n• İşlemler: alış/satış, komisyon ve gerçekleşen kâr/zarar\n• Temettüler: brüt, stopaj ve net tutar\n\nKayıtlar cihazınızdaki yerel veritabanından alınır; internet gerekmez."
     }
 
+
+    private fun renderAnalytics() {
+        val container = analyticsContainer ?: return
+        container.removeAllViews()
+        val active = currentAssets.filter { it.quantity > 0.0 }
+        if (active.isEmpty()) {
+            container.addView(TextView(this).apply {
+                text = "Grafikleri görüntülemek için portföye varlık ekleyin."
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            })
+            return
+        }
+        fun addChart(title: String, subtitle: String,
+                     type: com.portfolio.app.ui.chart.AnalyticsChartView.ChartType,
+                     values: List<Double>, labels: List<String>) {
+            container.addView(TextView(this).apply {
+                text = "$title\n$subtitle"
+                textSize = 15f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+                setPadding(0, dp(18), 0, dp(8))
+            })
+            container.addView(com.portfolio.app.ui.chart.AnalyticsChartView(this).apply {
+                chartType = type
+                chartValues = values
+                chartLabels = labels
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(220))
+            })
+        }
+        val marketValues = active.map { it.quantity * (it.lastPrice ?: it.costPrice) }
+        val invested = active.map { it.quantity * it.costPrice }
+        val unrealized = marketValues.mapIndexed { index, value -> value - invested[index] }
+        addChart("Varlık dağılımı", "Güncel piyasa değerine göre",
+            com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.DONUT, marketValues, active.map { it.ticker })
+        addChart("Varlık bazında piyasa değeri", "Enstrümanların portföye katkısı",
+            com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, marketValues, active.map { it.ticker })
+        addChart("Gerçekleşmemiş kâr / zarar", "Ortalama maliyet ile son fiyat farkı",
+            com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, unrealized, active.map { it.ticker })
+        val realized = currentTrades.filter { it.action == "SELL" }.sumOf { it.realizedProfit }
+        container.addView(TextView(this).apply {
+            text = "Gerçekleşmiş satış kâr/zararı: ${currency(realized)}"
+            textSize = 14f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_green))
+            setPadding(0, dp(12), 0, dp(8))
+        })
+        val months = (0..5).map { offset ->
+            val cal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, offset - 5) }
+            cal.get(java.util.Calendar.MONTH) to cal.get(java.util.Calendar.YEAR)
+        }
+        val monthlyDividends = months.map { (month, year) ->
+            currentDividends.filter { dividend ->
+                val cal = java.util.Calendar.getInstance().apply { timeInMillis = dividend.paymentDate }
+                cal.get(java.util.Calendar.MONTH) == month && cal.get(java.util.Calendar.YEAR) == year
+            }.sumOf { it.netAmount }
+        }
+        addChart("Temettü nakit akışı", "Son 6 ay • kaydedilmiş net ödemeler",
+            com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, monthlyDividends,
+            months.map { (month, year) -> String.format(Locale("tr", "TR"), "%02d/%02d", month + 1, year % 100) })
+        container.addView(TextView(this).apply {
+            text = "Bilgi: Portföyün geçmiş değerlerini henüz günlük olarak kaydetmiyoruz. Bu nedenle zaman serisi ve BIST 100 karşılaştırması, geçmiş veri kaydı eklendikten sonra etkinleştirilecek."
+            textSize = 12f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            setPadding(0, dp(14), 0, dp(24))
+        })
+    }
+
     private fun writeExcel(uri: Uri?) {
         if (uri == null) return
         try {
