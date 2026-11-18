@@ -43,6 +43,7 @@ class MainViewModel(application:Application):AndroidViewModel(application){
      runCatching { marketData.fetchQuote(asset) }.getOrNull()?.let{quote->
       runCatching { repository.updatePrice(asset.id,quote.price,quote.updatedAt) }
      }
+     runCatching { repository.recordCurrentPriceSnapshot(asset.id) }
     }
     runCatching { repository.recordDailySnapshot() }
     _dailyPnlTry.value=runCatching{repository.dailyProfitLoss("TRY")}.getOrNull()
