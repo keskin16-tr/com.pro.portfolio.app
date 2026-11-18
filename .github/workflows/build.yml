@@ -1,19 +1,15 @@
 name: Portfolio Pro Android APK
-
 on:
   push:
-    branches: [main, portfolio-pro-3.0]
+    branches: [main, portfolio-pro-3.0, portfolio-pro-3.1, portfolio-pro-3.2, portfolio-pro-3.3, portfolio-pro-3.4, portfolio-pro-3.5, portfolio-pro-3.6]
   pull_request:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   build:
     name: Build and verify APK
