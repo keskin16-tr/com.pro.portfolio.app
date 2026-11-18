@@ -30,6 +30,7 @@ class PortfolioRepository(private val database: AppDatabase) {
         category: String = "OTHER", currency: String = "TRY", fee: Double = 0.0,
         broker: String = "Belirtilmedi", priceSource: String = "AUTO"
     ) {
+        require(currency.uppercase() in listOf("TRY", "USD")) { "Varlık para birimi yalnızca TRY veya USD olabilir." }
         require(quantity > 0.0 && unitPrice >= 0.0 && fee >= 0.0)
         database.withTransaction {
             val existing = assetDao.getAssetsOnce().firstOrNull { it.ticker.equals(ticker, ignoreCase = true) }
@@ -72,6 +73,7 @@ class PortfolioRepository(private val database: AppDatabase) {
         ticker: String, grossAmount: Double, taxPercent: Double = 0.0,
         currency: String = "TRY", paymentDate: Long = System.currentTimeMillis(), note: String = ""
     ) {
+        require(currency.uppercase() in listOf("TRY", "USD")) { "Temettü para birimi yalnızca TRY veya USD olabilir." }
         require(grossAmount > 0.0 && taxPercent in 0.0..100.0)
         database.withTransaction {
             val asset = assetDao.getAssetsOnce().firstOrNull { it.ticker.equals(ticker.trim(), true) }
@@ -95,6 +97,7 @@ class PortfolioRepository(private val database: AppDatabase) {
         database.withTransaction {
             val existing = assetDao.getAssetsOnce().map { it.ticker.uppercase() }.toMutableSet()
             holdings.forEach { row ->
+                require(row.currency.uppercase() in listOf("TRY", "USD")) { "${row.ticker} için para birimi TRY veya USD olmalı." }
                 if (row.ticker.uppercase() in existing) {
                     skipped++
                 } else {
@@ -122,6 +125,7 @@ class PortfolioRepository(private val database: AppDatabase) {
         quantity: Double? = null, costPrice: Double? = null, currency: String = "TRY",
         priceSource: String = "AUTO", manualPrice: Double? = null
     ) {
+        require(currency.uppercase() in listOf("TRY", "USD")) { "Varlık para birimi yalnızca TRY veya USD olabilir." }
         require(name.isNotBlank() && ticker.isNotBlank() && category.isNotBlank() && broker.isNotBlank())
         database.withTransaction {
             val existing = assetDao.getById(assetId) ?: error("Varlık bulunamadı")
