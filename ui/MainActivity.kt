@@ -752,19 +752,19 @@ class MainActivity : AppCompatActivity() {
         }
         var executedAt = trade.executedAt
         val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
-        val dateButton = MaterialButton(this).apply {
-            text = dateFormat.format(Date(executedAt)); isAllCaps = false
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
-            backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface_alt))
-            setOnClickListener {
-                val initial = java.util.Calendar.getInstance().apply { timeInMillis = executedAt }
-                android.app.DatePickerDialog(this@MainActivity, { _, year, month, day ->
-                    android.app.TimePickerDialog(this@MainActivity, { _, hour, minute ->
-                        executedAt = java.util.Calendar.getInstance().apply { set(year, month, day, hour, minute, 0); set(java.util.Calendar.MILLISECOND, 0) }.timeInMillis
-                        dateButton.text = dateFormat.format(Date(executedAt))
-                    }, initial.get(java.util.Calendar.HOUR_OF_DAY), initial.get(java.util.Calendar.MINUTE), true).show()
-                }, initial.get(java.util.Calendar.YEAR), initial.get(java.util.Calendar.MONTH), initial.get(java.util.Calendar.DAY_OF_MONTH)).show()
-            }
+        val dateButton = MaterialButton(this)
+        dateButton.text = dateFormat.format(Date(executedAt))
+        dateButton.isAllCaps = false
+        dateButton.setTextColor(ContextCompat.getColor(this, R.color.portfolio_text))
+        dateButton.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.portfolio_surface_alt))
+        dateButton.setOnClickListener {
+            val initial = java.util.Calendar.getInstance().apply { timeInMillis = executedAt }
+            android.app.DatePickerDialog(this@MainActivity, { _, year, month, day ->
+                android.app.TimePickerDialog(this@MainActivity, { _, hour, minute ->
+                    executedAt = java.util.Calendar.getInstance().apply { set(year, month, day, hour, minute, 0); set(java.util.Calendar.MILLISECOND, 0) }.timeInMillis
+                    dateButton.text = dateFormat.format(Date(executedAt))
+                }, initial.get(java.util.Calendar.HOUR_OF_DAY), initial.get(java.util.Calendar.MINUTE), true).show()
+            }, initial.get(java.util.Calendar.YEAR), initial.get(java.util.Calendar.MONTH), initial.get(java.util.Calendar.DAY_OF_MONTH)).show()
         }
         val quantity = field("Miktar", trade.quantity.toString())
         val price = field("Birim fiyat", trade.unitPrice.toString())
