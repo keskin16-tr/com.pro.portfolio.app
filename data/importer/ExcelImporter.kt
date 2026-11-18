@@ -15,7 +15,8 @@ data class ImportedHolding(
     val costPrice: Double,
     val lastPrice: Double?,
     val currency: String,
-    val broker: String
+    val broker: String,
+    val priceSource: String = "AUTO"
 )
 
 object ExcelImporter {
@@ -48,6 +49,7 @@ object ExcelImporter {
         val lastCol = column("Son Fiyat", "Güncel Fiyat", "Last Price", "Price")
         val currencyCol = column("Para Birimi", "Currency")
         val brokerCol = column("Aracı Kurum", "Kurum", "Broker", "Brokerage")
+        val sourceCol = column("Fiyat Kaynağı", "Price Source", "Provider")
         return rows.drop(1).mapNotNull { row ->
             fun value(index: Int?): String = index?.let { row.getOrNull(it).orEmpty().trim() }.orEmpty()
             val ticker = value(tickerCol).uppercase(Locale.ROOT)
@@ -59,7 +61,8 @@ object ExcelImporter {
                 value(portfolioCol).ifBlank { "Ana Portföy" }, quantity, cost,
                 lastCol?.let { parseNumber(value(it)) },
                 value(currencyCol).ifBlank { if (normalizeCategory(value(categoryCol)) == "US_STOCK") "USD" else "TRY" }.uppercase(Locale.ROOT),
-                value(brokerCol).ifBlank { "Belirtilmedi" }
+                value(brokerCol).ifBlank { "Belirtilmedi" },
+                normalizePriceSource(value(sourceCol))
             )
         }.distinctBy { it.ticker }
     }
@@ -133,7 +136,7 @@ object ExcelImporter {
         .replace("Ü", "U").replace("Ö", "O").replace("Ç", "C")
         .replace(Regex("[^A-Z0-9]"), "")
 
-    private fun normalizeCategory(value: String): String = when (normalize(value)) {
+    private fun normalizePriceSource(value: String): String = when (normalize(value)) {\n        "YAHOOFINANCE", "YAHOO" -> "YAHOO_FINANCE"\n        "COINGECKO" -> "COINGECKO"\n        "FRANKFURTER" -> "FRANKFURTER"\n        "MANUEL", "ELLEGIRIS" -> "MANUAL"\n        else -> "AUTO"\n    }\n\n    private fun normalizeCategory(value: String): String = when (normalize(value)) {
         "HISSE", "HISSEBIST", "HISSESENEDI", "STOCK", "BIST" -> "STOCK"
         "AMERIKANBORSALARI", "AMERIKANHISSE", "USSTOCK", "USSTOCKS", "NASDAQ", "NYSE", "USA" -> "US_STOCK"
         "FON", "YATIRIMFONU", "FUND" -> "FUND"
