@@ -112,8 +112,9 @@ class MainActivity : AppCompatActivity() {
                     binding.tvAssetCount.text = getString(R.string.asset_count, assets.size)
                     binding.tvHoldingsCount.text = "${assets.size} kayıt"
                     binding.tvEmptyState.visibility = if (assets.isEmpty()) View.VISIBLE else View.GONE
-                    binding.tvChartEmpty.visibility = if (assets.isEmpty()) View.VISIBLE else View.GONE
-                    binding.portfolioChart.setValues(assets.map { ((it.lastPrice ?: it.costPrice) * it.quantity).toFloat() })
+                    val tryAssets = assets.filter { it.currency.equals("TRY", true) }
+                    binding.tvChartEmpty.visibility = if (tryAssets.isEmpty()) View.VISIBLE else View.GONE
+                    binding.portfolioChart.setValues(tryAssets.map { ((it.lastPrice ?: it.costPrice) * it.quantity).toFloat() })
 
                     binding.btnSellAsset.isEnabled = assets.any { it.quantity > 0.0 }
                     updatePageContent()
@@ -720,6 +721,14 @@ class MainActivity : AppCompatActivity() {
         val quantity = field("Satılacak miktar")
         val price = field("Birim satış fiyatı (${available.first().currency})")
         val fee = field("Komisyon / masraf (${available.first().currency})").apply { setText("0") }
+        spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val code = available[position.coerceIn(0, available.lastIndex)].currency
+                price.hint = "Birim satış fiyatı ($code)"
+                fee.hint = "Komisyon / masraf ($code)"
+            }
+        }
         box.addView(spinner); box.addView(quantity); box.addView(price); box.addView(fee)
         androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Varlık satışı").setView(box)
             .setNegativeButton("İptal", null)
