@@ -10,5 +10,6 @@ data class AssetEntity(
  val currency:String="TRY",val marketSymbol:String="",val lastPrice:Double?=null,val priceUpdatedAt:Long?=null,
  @ColumnInfo(defaultValue="'Belirtilmedi'") val broker:String="Belirtilmedi",
  @ColumnInfo(defaultValue="0.0") val openingQuantity:Double=0.0,
- @ColumnInfo(defaultValue="0.0") val openingCostPrice:Double=0.0
+ @ColumnInfo(defaultValue="0.0") val openingCostPrice:Double=0.0,
+ @ColumnInfo(defaultValue="'AUTO'") val priceSource:String="AUTO"
 )
