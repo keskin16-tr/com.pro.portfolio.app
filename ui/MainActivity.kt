@@ -648,8 +648,8 @@ class MainActivity : AppCompatActivity() {
         currentAssets.forEach { asset ->
             val card = com.google.android.material.card.MaterialCardView(this).apply {
                 radius = dp(16).toFloat()
-                cardBackgroundColor = ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface)
-                strokeColor = ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue)
+                setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+                setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue)))
                 strokeWidth = dp(1)
                 layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
             }
@@ -688,7 +688,7 @@ class MainActivity : AppCompatActivity() {
             val symbol = assets[trade.assetId]?.ticker ?: "Varlık #${trade.assetId}"
             val card = com.google.android.material.card.MaterialCardView(this).apply {
                 radius = dp(16).toFloat(); cardBackgroundColor = ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface)
-                strokeColor = ContextCompat.getColor(this@MainActivity, if (trade.action == "SELL") R.color.portfolio_orange else R.color.portfolio_green)
+                setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, if (trade.action == "SELL") R.color.portfolio_orange else R.color.portfolio_green)))
                 strokeWidth = dp(1); layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
             }
             val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(14), dp(16), dp(14)) }
@@ -720,7 +720,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showEditAssetDialog(asset: AssetEntity) {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(8), dp(22), 0) }
-        fun field(hint: String, value: String) = android.widget.EditText(this).apply { this.hint = hint; setText(value); singleLine = true }
+        fun field(hint: String, value: String) = android.widget.EditText(this).apply { this.hint = hint; setText(value); isSingleLine = true }
         val name = field("Varlık adı", asset.name)
         val ticker = field("Sembol", asset.ticker)
         val categories = listOf("STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
