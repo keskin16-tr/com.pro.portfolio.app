@@ -134,13 +134,13 @@ object ExcelImporter {
         .replace(Regex("[^A-Z0-9]"), "")
 
     private fun normalizeCategory(value: String): String = when (normalize(value)) {
-        "HISSE", "HISSESENEDI", "STOCK", "BIST" -> "STOCK"
+        "HISSE", "HISSEBIST", "HISSESENEDI", "STOCK", "BIST" -> "STOCK"
         "FON", "YATIRIMFONU", "FUND" -> "FUND"
         "KRIPTO", "KRIPTOPARA", "CRYPTO" -> "CRYPTO"
         "DOVIZ", "FX", "CURRENCY" -> "FX"
         "ALTIN", "GOLD", "KIYMETLIMADEN" -> "GOLD"
         "EMTIA", "COMMODITY" -> "COMMODITY"
-        "TAHVIL", "BONO", "BOND" -> "BOND"
+        "TAHVIL", "BONO", "TAHVILBONO", "BOND" -> "BOND"
         "NAKIT", "CASH" -> "CASH"
         else -> "OTHER"
     }
