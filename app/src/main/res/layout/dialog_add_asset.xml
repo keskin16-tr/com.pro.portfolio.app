@@ -8,6 +8,7 @@
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="Varlık kategorisi" android:textColor="@color/portfolio_muted" android:textSize="12sp"/>
 <Spinner android:id="@+id/spinnerCategory" android:layout_width="match_parent" android:layout_height="52dp" android:entries="@array/asset_category_labels" android:spinnerMode="dropdown" android:backgroundTint="@color/portfolio_blue"/>
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Aracı kurum" android:textColor="@color/portfolio_muted" android:textSize="12sp"/>
+<Spinner android:id="@+id/spinnerBroker" android:layout_width="match_parent" android:layout_height="52dp" android:entries="@array/broker_names" android:spinnerMode="dropdown" android:backgroundTint="@color/portfolio_blue"/>
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Varlık para birimi" android:textColor="@color/portfolio_muted" android:textSize="12sp"/>
 <Spinner android:id="@+id/spinnerCurrency" android:layout_width="match_parent" android:layout_height="52dp" android:entries="@array/asset_currency_labels" android:spinnerMode="dropdown" android:backgroundTint="@color/portfolio_blue"/>
 <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="Fiyat veri kaynağı" android:textColor="@color/portfolio_muted" android:textSize="12sp"/>
