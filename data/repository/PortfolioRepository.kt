@@ -4,16 +4,20 @@ import com.portfolio.app.data.local.AppDatabase
 import com.portfolio.app.data.local.AssetEntity
 import com.portfolio.app.data.local.TradeEntity
 import com.portfolio.app.data.local.DividendEntity
+import com.portfolio.app.data.local.PortfolioSnapshotEntity
 import kotlinx.coroutines.flow.Flow
+import java.util.Calendar
 class PortfolioRepository(private val database:AppDatabase){
  private val assetDao=database.assetDao()
  private val tradeDao=database.tradeDao()
  private val dividendDao=database.dividendDao()
+ private val snapshotDao=database.portfolioSnapshotDao()
  val allAssets:Flow<List<AssetEntity>> = assetDao.getAllAssets()
  val allTrades:Flow<List<TradeEntity>> = tradeDao.getAll()
  val tradeCount:Flow<Int> = tradeDao.count()
  val allDividends:Flow<List<DividendEntity>> = dividendDao.getAll()
  val totalNetDividends:Flow<Double> = dividendDao.totalNet()
+ val allSnapshots:Flow<List<PortfolioSnapshotEntity>> = snapshotDao.getAll()
  suspend fun recordBuy(name:String,ticker:String,quantity:Double,unitPrice:Double,category:String="OTHER",currency:String="TRY",fee:Double=0.0){
   require(quantity>0.0&&unitPrice>=0.0&&fee>=0.0)
   database.withTransaction{
@@ -43,6 +47,19 @@ class PortfolioRepository(private val database:AppDatabase){
    val tax=grossAmount*taxPercent/100.0
    dividendDao.insert(DividendEntity(assetId=asset.id,ticker=asset.ticker,quantityAtPayment=asset.quantity,grossAmount=grossAmount,withholdingTax=tax,netAmount=grossAmount-tax,currency=asset.currency,exDate=paymentDate,paymentDate=paymentDate,note=note))
   }
+ }
+
+ suspend fun recordDailySnapshot(){
+  val assets=assetDao.getAssetsOnce()
+  if(assets.isEmpty()) return
+  val calendar=Calendar.getInstance().apply {
+   set(Calendar.HOUR_OF_DAY,0);set(Calendar.MINUTE,0);set(Calendar.SECOND,0);set(Calendar.MILLISECOND,0)
+  }
+  val day=calendar.timeInMillis
+  if((snapshotDao.latestDate()?:Long.MIN_VALUE)>=day) return
+  val marketValue=assets.sumOf{it.quantity*(it.lastPrice?:it.costPrice)}
+  val investedValue=assets.sumOf{it.quantity*it.costPrice}
+  snapshotDao.insert(PortfolioSnapshotEntity(day,marketValue,investedValue,assets.size))
  }
  suspend fun delete(asset:AssetEntity){assetDao.deleteAsset(asset)}
  suspend fun updatePrice(assetId:Long,price:Double,updatedAt:Long=System.currentTimeMillis()){
