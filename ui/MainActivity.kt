@@ -165,8 +165,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showAddAssetDialog() {
-        AddAssetDialogFragment { name, ticker, quantity, costPrice, category, broker, currencyCode, priceSource ->
-            viewModel.addAsset(name, ticker, quantity, costPrice, category, broker, currencyCode, priceSource)
+        AddAssetDialogFragment { name, ticker, quantity, costPrice, category, broker, currencyCode, priceSource, manualPrice ->
+            viewModel.addAsset(name, ticker, quantity, costPrice, category, broker, currencyCode, priceSource, manualPrice)
         }.show(supportFragmentManager, "AddAssetDialog")
     }
 
