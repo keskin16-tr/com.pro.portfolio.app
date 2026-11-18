@@ -54,6 +54,7 @@ class MainActivity : AppCompatActivity() {
     private var analyticsContainer: LinearLayout? = null
     private val pageViews = mutableMapOf<Int, View>()
     private val pageTexts = mutableMapOf<Int, TextView>()
+    private val pageClockViews = mutableListOf<TextView>()
     private var currentAssets: List<AssetEntity> = emptyList()
     private var currentTrades: List<TradeEntity> = emptyList()
     private var currentDividends: List<DividendEntity> = emptyList()
@@ -62,7 +63,9 @@ class MainActivity : AppCompatActivity() {
     private val clockUpdate = object : Runnable {
         override fun run() {
             if (::binding.isInitialized) {
-                binding.tvCurrentDateTime.text = SimpleDateFormat("EEEE, dd MMMM yyyy • HH:mm:ss", Locale("tr", "TR")).format(Date())
+                val nowText = SimpleDateFormat("EEEE, dd MMMM yyyy • HH:mm:ss", Locale("tr", "TR")).format(Date())
+                binding.tvCurrentDateTime.text = nowText
+                pageClockViews.forEach { it.text = nowText }
                 clockHandler.postDelayed(this, 1_000L)
             }
         }
@@ -220,6 +223,14 @@ class MainActivity : AppCompatActivity() {
                 })
             }
             content.addView(title)
+            val pageClock = TextView(this).apply {
+                textSize = 12f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                setPadding(0, dp(8), 0, dp(8))
+            }
+            pageClockViews += pageClock
+            content.addView(pageClock)
             content.addView(body)
             if (id == NAV_MORE) {
                 content.addView(actionButton("Kategori dağılımı", R.color.portfolio_blue) { showPage(NAV_CATEGORIES) })
