@@ -25,6 +25,7 @@ class PortfolioRepository(private val database:AppDatabase){
    val existing=assetDao.getAssetsOnce().firstOrNull{it.ticker.equals(ticker,ignoreCase=true)}
    val assetId=existing?.id?:assetDao.insertAsset(AssetEntity(name=name.trim(),ticker=ticker.trim().uppercase(),quantity=0.0,costPrice=0.0,category=category,currency=currency,marketSymbol=defaultMarketSymbol(ticker,category),broker=broker))
    val current=assetDao.getById(assetId)?:error("Varlık kaydı oluşturulamadı")
+   require(current.currency.equals(currency,true)){"Aynı sembol farklı para birimiyle zaten kayıtlı. Her para birimini ayrı varlık olarak izlemek için farklı portföy sembolü kullanın."}
    val newQuantity=current.quantity+quantity
    val averageCost=(current.quantity*current.costPrice+quantity*unitPrice+fee)/newQuantity
    tradeDao.insert(TradeEntity(assetId=assetId,action="BUY",quantity=quantity,unitPrice=unitPrice,fee=fee,note="Alış işlemi"))
