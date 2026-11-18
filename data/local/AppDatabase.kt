@@ -87,6 +87,7 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE assets ADD COLUMN openingQuantity REAL NOT NULL DEFAULT 0.0")
                 db.execSQL("ALTER TABLE assets ADD COLUMN openingCostPrice REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("""UPDATE assets SET openingQuantity = quantity, openingCostPrice = costPrice WHERE NOT EXISTS (SELECT 1 FROM transactions WHERE transactions.assetId = assets.id)""")
             }
         }
 
