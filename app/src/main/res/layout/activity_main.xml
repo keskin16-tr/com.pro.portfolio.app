@@ -199,6 +199,37 @@
                 </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSellAsset"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Varlık satışı yap"
+                android:textColor="@color/portfolio_text"
+                app:backgroundTint="@color/portfolio_surface"
+                app:strokeColor="@color/portfolio_green"
+                app:strokeWidth="1dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="26dp"
+                android:layout_marginBottom="8dp"
+                android:text="İşlem geçmişi"
+                android:textColor="@color/portfolio_text"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvTradeHistory"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_empty"
+                android:padding="16dp"
+                android:text="Henüz işlem bulunmuyor."
+                android:textColor="@color/portfolio_muted"
+                android:textSize="13sp" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
