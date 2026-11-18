@@ -1023,6 +1023,9 @@ class MainActivity : AppCompatActivity() {
         private const val NAV_MORE = 7
         private const val NAV_CATEGORIES = 8
         private const val NAV_BROKERS = 9
-        private const val NAV_IMPORT = 10\n        private const val NAV_BIST = 11\n        private const val NAV_CRYPTO = 12\n        private const val NAV_RATES = 13
+        private const val NAV_IMPORT = 10
+        private const val NAV_BIST = 11
+        private const val NAV_CRYPTO = 12
+        private const val NAV_RATES = 13
     }
 }
