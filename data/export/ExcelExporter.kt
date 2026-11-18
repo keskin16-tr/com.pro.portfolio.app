@@ -59,21 +59,21 @@ object ExcelExporter {
             """.trimIndent())
 
             val holdingsRows = mutableListOf<List<Any?>>()
-            holdingsRows += listOf("Sembol", "Varlık", "Kategori", "Portföy", "Adet", "Ortalama Maliyet", "Son Fiyat", "Piyasa Değeri", "Maliyet Tutarı", "Kâr/Zarar", "Para Birimi", "Aracı Kurum")
+            holdingsRows += listOf("Sembol", "Varlık", "Kategori", "Portföy", "Adet", "Ortalama Maliyet", "Son Fiyat", "Piyasa Değeri", "Maliyet Tutarı", "Kâr/Zarar", "Para Birimi", "Aracı Kurum", "Fiyat Kaynağı")
             assets.forEach { a ->
                 val price = a.lastPrice ?: a.costPrice
                 holdingsRows += listOf(a.ticker, a.name, a.category, a.portfolioName, a.quantity,
                     a.costPrice, price, a.quantity * price, a.quantity * a.costPrice,
-                    a.quantity * (price - a.costPrice), a.currency, a.broker)
+                    a.quantity * (price - a.costPrice), a.currency, a.broker, a.priceSource)
             }
             val tradeRows = mutableListOf<List<Any?>>()
-            tradeRows += listOf("Tarih", "Sembol", "İşlem", "Miktar", "Birim Fiyat", "Tutar", "Komisyon", "Gerçekleşen K/Z", "Not")
+            tradeRows += listOf("Tarih", "Sembol", "İşlem", "Miktar", "Birim Fiyat", "Tutar", "Komisyon / Stopaj", "Gerçekleşen K/Z", "Para Birimi", "Not")
             val assetById = assets.associateBy { it.id }
             val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
             trades.forEach { t ->
                 tradeRows += listOf(dateFormat.format(Date(t.executedAt)), assetById[t.assetId]?.ticker ?: "ID ${t.assetId}",
-                    if (t.action == "SELL") "SATIŞ" else "ALIŞ", t.quantity, t.unitPrice,
-                    t.quantity * t.unitPrice, t.fee, t.realizedProfit, t.note)
+                    when (t.action) { "SELL" -> "SATIŞ"; "DIVIDEND" -> "TEMETTÜ"; else -> "ALIŞ" }, t.quantity, t.unitPrice,
+                    t.quantity * t.unitPrice, t.fee, t.realizedProfit, t.currency, t.note)
             }
             val dividendRows = mutableListOf<List<Any?>>()
             dividendRows += listOf("Ödeme Tarihi", "Sembol", "Ödeme Anındaki Adet", "Brüt Temettü", "Stopaj", "Net Temettü", "Para Birimi", "Not")
