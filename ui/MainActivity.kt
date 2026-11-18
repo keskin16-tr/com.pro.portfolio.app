@@ -142,12 +142,6 @@ class MainActivity : AppCompatActivity() {
                     setOnClickListener { createExcelDocument.launch("PortfolioPro_Rapor.xlsx") }
                 }
                 content.addView(exportButton)
-                val csvButton = Button(this).apply {
-                    text = "CSV olarak dışa aktar"
-                    setOnClickListener { createExcelDocument.launch("PortfolioPro_Rapor.xlsx") }
-                }
-                // Excel çalışma kitabı üç ayrı sayfa içerir; CSV dışa aktarımı ayrıca sonraki sürümde eklenecek.
-                content.addView(csvButton)
             }
             page.addView(content)
             root.addView(page, CoordinatorLayout.LayoutParams(
@@ -175,7 +169,11 @@ class MainActivity : AppCompatActivity() {
         root.addView(bottomNavigation, CoordinatorLayout.LayoutParams(
             CoordinatorLayout.LayoutParams.MATCH_PARENT, dp(76)
         ).apply { gravity = Gravity.BOTTOM })
-        (binding.fabAddAsset.layoutParams as? CoordinatorLayout.LayoutParams)?.let { params ->\n            params.bottomMargin = dp(90)\n            binding.fabAddAsset.layoutParams = params\n        }\n        bottomNavigation.selectedItemId = NAV_HOME
+        (binding.fabAddAsset.layoutParams as? CoordinatorLayout.LayoutParams)?.let { params ->
+            params.bottomMargin = dp(90)
+            binding.fabAddAsset.layoutParams = params
+        }
+        bottomNavigation.selectedItemId = NAV_HOME
         updatePageContent()
     }
 
