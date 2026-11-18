@@ -291,7 +291,8 @@ class MainActivity : AppCompatActivity() {
                 val rates = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 content.addView(rates)
                 ratesContainer = rates
-            }\n            if (id == NAV_ANALYTICS) {
+            }
+            if (id == NAV_ANALYTICS) {
                 val chartColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 content.addView(chartColumn)
                 analyticsContainer = chartColumn
@@ -397,6 +398,125 @@ class MainActivity : AppCompatActivity() {
         renderAnalytics()
     }
 
+    private fun updateSummary() {
+        val currencies = listOf("TRY", "USD")
+        fun rowsFor(calc: (String) -> Double): String = currencies.mapNotNull { code ->
+            val amount = calc(code)
+            if (amount == 0.0 && currentAssets.none { it.currency == code } && currentTrades.none { it.currency == code }) null
+            else currency(amount, code)
+        }.joinToString("\n").ifBlank { "—" }
+        val invested = rowsFor { code -> currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.quantity * it.costPrice } }
+        val totalPnl = rowsFor { code ->
+            val unrealized = currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.quantity * ((it.lastPrice ?: it.costPrice) - it.costPrice) }
+            val realized = currentTrades.filter { it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
+            unrealized + realized
+        }
+        binding.tvTotalValue.text = invested
+        binding.tvTotalProfitLoss.text = totalPnl
+        binding.tvDailyProfitLoss.text = buildString {
+            append("TRY  •  "); append(dailyPnlTry?.let { currency(it, "TRY") } ?: "Önceki gün verisi birikiyor")
+            append("\nUSD  •  "); append(dailyPnlUsd?.let { currency(it, "USD") } ?: "Önceki gün verisi birikiyor")
+        }
+        binding.tvHeaderTitle.contentDescription = "Toplam yatırım $invested. Toplam kâr zarar $totalPnl"
+    }
+
+    private fun renderMarketAssets(pageId: Int) {
+        val list = pageLists[pageId] ?: return
+        list.removeAllViews()
+        if (pageId == NAV_BIST) {
+            val groups = listOf(
+                "BIST Hisseleri" to currentAssets.filter { it.category.uppercase() in listOf("STOCK", "BIST", "HISSE") },
+                "Amerikan Borsaları" to currentAssets.filter { it.category.uppercase() == "US_STOCK" }
+            )
+            groups.forEach { (heading, assets) ->
+                list.addView(TextView(this).apply {
+                    text = heading; textSize = 17f; typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_green))
+                    setPadding(0, dp(12), 0, dp(8))
+                })
+                if (assets.isEmpty()) list.addView(TextView(this).apply {
+                    text = "Bu bölümde henüz varlık yok."; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                    setPadding(0, 0, 0, dp(12))
+                }) else assets.forEach { addMarketAssetCard(list, it) }
+            }
+        } else {
+            val assets = currentAssets.filter { it.category.equals("CRYPTO", true) }
+            if (assets.isEmpty()) list.addView(TextView(this).apply {
+                text = "Henüz kripto varlık eklenmedi."; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            }) else assets.forEach { addMarketAssetCard(list, it) }
+        }
+    }
+
+    private fun addMarketAssetCard(list: LinearLayout, asset: AssetEntity) {
+        val card = com.google.android.material.card.MaterialCardView(this).apply {
+            radius = dp(16).toFloat()
+            setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+            setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue)))
+            strokeWidth = dp(1)
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
+        }
+        val price = asset.lastPrice ?: asset.costPrice
+        val value = price * asset.quantity
+        val pnl = (price - asset.costPrice) * asset.quantity
+        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(14), dp(16), dp(14)) }
+        column.addView(TextView(this).apply {
+            text = "${asset.ticker} • ${asset.name}"; textSize = 16f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+        })
+        column.addView(TextView(this).apply {
+            text = "${formatNumber(asset.quantity)} adet • Son fiyat ${currency(price, asset.currency)}\nPiyasa değeri ${currency(value, asset.currency)} • K/Z ${currency(pnl, asset.currency)}\nKaynak: ${sourceLabel(asset.priceSource)} • ${asset.broker}"
+            textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(6), 0, dp(8))
+        })
+        column.addView(actionButton("Varlığı düzenle", R.color.portfolio_blue) { showEditAssetDialog(asset) })
+        card.addView(column); list.addView(card)
+    }
+
+    private fun renderMarketRates() {
+        val container = ratesContainer ?: return
+        container.removeAllViews()
+        if (currentRates.isEmpty()) {
+            container.addView(TextView(this).apply {
+                text = "Piyasa verileri yükleniyor. Yahoo Finance üzerinden USD/TRY, EUR/TRY, altın ve gümüş vadeli işlem fiyatları sorgulanıyor."
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                setPadding(0, dp(16), 0, dp(16))
+            })
+            return
+        }
+        currentRates.forEach { rate ->
+            val card = com.google.android.material.card.MaterialCardView(this).apply {
+                radius = dp(16).toFloat()
+                setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+                setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue)))
+                strokeWidth = dp(1)
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) }
+            }
+            val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(16), dp(18), dp(16)) }
+            column.addView(TextView(this).apply {
+                text = rate.title; textSize = 15f; typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            })
+            column.addView(TextView(this).apply {
+                text = currency(rate.value, rate.currency); textSize = 26f; typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text)); setPadding(0, dp(5), 0, dp(3))
+            })
+            val change = rate.dailyChangePercent
+            column.addView(TextView(this).apply {
+                text = change?.let { String.format(Locale("tr", "TR"), "Günlük değişim  %+.2f%%", it) } ?: "Günlük değişim hesaplanamadı"
+                setTextColor(ContextCompat.getColor(this@MainActivity, if ((change ?: 0.0) >= 0.0) R.color.portfolio_green else R.color.portfolio_orange))
+                textSize = 14f; typeface = Typeface.DEFAULT_BOLD
+            })
+            column.addView(TextView(this).apply {
+                text = "${rate.source} • ${SimpleDateFormat("HH:mm:ss", Locale("tr", "TR")).format(Date(rate.updatedAt))}"
+                textSize = 11f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(6), 0, 0)
+            })
+            card.addView(column); container.addView(card)
+        }
+        container.addView(TextView(this).apply {
+            text = "Gram altın ve gram gümüş, ons vadeli işlem fiyatı × USD/TRY ÷ 31,1034768 formülüyle hesaplanır. Veriler Yahoo Finance kaynaklıdır; piyasa/sağlayıcı gecikmeleri olabilir."
+            textSize = 11f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(10), 0, dp(20))
+        })
+    }
+
     private fun renderAnalytics() {
         val container = analyticsContainer ?: return
         container.removeAllViews()
@@ -411,69 +531,52 @@ class MainActivity : AppCompatActivity() {
         fun addChart(title: String, subtitle: String,
                      type: com.portfolio.app.ui.chart.AnalyticsChartView.ChartType,
                      values: List<Double>, labels: List<String>) {
+            if (values.isEmpty()) return
             container.addView(TextView(this).apply {
-                text = "$title\n$subtitle"
-                textSize = 15f
-                typeface = Typeface.DEFAULT_BOLD
+                text = "$title\n$subtitle"; textSize = 15f; typeface = Typeface.DEFAULT_BOLD
                 setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
                 setPadding(0, dp(18), 0, dp(8))
             })
             container.addView(com.portfolio.app.ui.chart.AnalyticsChartView(this).apply {
-                chartType = type
-                chartValues = values
-                chartLabels = labels
+                chartType = type; chartValues = values; chartLabels = labels
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(220))
             })
         }
-        val marketValues = active.map { it.quantity * (it.lastPrice ?: it.costPrice) }
-        val invested = active.map { it.quantity * it.costPrice }
-        val unrealized = marketValues.mapIndexed { index, value -> value - invested[index] }
-        addChart("Varlık dağılımı", "Güncel piyasa değerine göre",
-            com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.DONUT, marketValues, active.map { it.ticker })
-        addChart("Varlık bazında piyasa değeri", "Enstrümanların portföye katkısı",
-            com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, marketValues, active.map { it.ticker })
-        addChart("Gerçekleşmemiş kâr / zarar", "Ortalama maliyet ile son fiyat farkı",
-            com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, unrealized, active.map { it.ticker })
-        val realized = currentTrades.filter { it.action == "SELL" }.sumOf { it.realizedProfit }
+        listOf("TRY", "USD").forEach { code ->
+            val group = active.filter { it.currency.equals(code, true) }
+            if (group.isNotEmpty()) {
+                container.addView(TextView(this).apply {
+                    text = if (code == "TRY") "TÜRK LİRASI PORTFÖYÜ" else "ABD DOLARI PORTFÖYÜ"
+                    textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_green))
+                    setPadding(0, dp(18), 0, dp(4))
+                })
+                val market = group.map { it.quantity * (it.lastPrice ?: it.costPrice) }
+                val unrealized = group.map { (it.lastPrice ?: it.costPrice - it.costPrice) * it.quantity }
+                addChart("Varlık dağılımı", "Güncel piyasa değerine göre • $code", com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.DONUT, market, group.map { it.ticker })
+                addChart("Gerçekleşmemiş kâr / zarar", "Ortalama maliyet ile son fiyat farkı • $code", com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, unrealized, group.map { it.ticker })
+                val realized = currentTrades.filter { it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
+                container.addView(TextView(this).apply {
+                    text = "Gerçekleşmiş satış kâr/zararı: ${currency(realized, code)}"
+                    textSize = 13f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text)); setPadding(0, dp(8), 0, dp(8))
+                })
+            }
+        }
+        listOf("TRY", "USD").forEach { code ->
+            val monthly = (0..5).map { offset ->
+                val cal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, offset - 5) }
+                val month = cal.get(java.util.Calendar.MONTH); val year = cal.get(java.util.Calendar.YEAR)
+                currentDividends.filter { dividend ->
+                    val d = java.util.Calendar.getInstance().apply { timeInMillis = dividend.paymentDate }
+                    dividend.currency.equals(code, true) && d.get(java.util.Calendar.MONTH) == month && d.get(java.util.Calendar.YEAR) == year
+                }.sumOf { it.netAmount }
+            }
+            if (monthly.any { it > 0.0 }) addChart("Temettü nakit akışı", "Son 6 ay • $code", com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, monthly,
+                (0..5).map { offset -> val cal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, offset - 5) }; String.format(Locale("tr", "TR"), "%02d/%02d", cal.get(java.util.Calendar.MONTH)+1, cal.get(java.util.Calendar.YEAR)%100) })
+        }
         container.addView(TextView(this).apply {
-            text = "Gerçekleşmiş satış kâr/zararı: ${currency(realized)}"
-            textSize = 14f
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_green))
-            setPadding(0, dp(12), 0, dp(8))
-        })
-        val months = (0..5).map { offset ->
-            val cal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, offset - 5) }
-            cal.get(java.util.Calendar.MONTH) to cal.get(java.util.Calendar.YEAR)
-        }
-        val monthlyDividends = months.map { (month, year) ->
-            currentDividends.filter { dividend ->
-                val cal = java.util.Calendar.getInstance().apply { timeInMillis = dividend.paymentDate }
-                cal.get(java.util.Calendar.MONTH) == month && cal.get(java.util.Calendar.YEAR) == year
-            }.sumOf { it.netAmount }
-        }
-        addChart("Temettü nakit akışı", "Son 6 ay • kaydedilmiş net ödemeler",
-            com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, monthlyDividends,
-            months.map { (month, year) -> String.format(Locale("tr", "TR"), "%02d/%02d", month + 1, year % 100) })
-        val history = currentSnapshots.takeLast(30)
-        if (history.isNotEmpty()) {
-            addChart("Portföy değer geçmişi", "Uygulama açıldığından beri kaydedilen günlük değerler",
-                com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.LINE,
-                history.map { it.marketValue },
-                history.map { SimpleDateFormat("dd.MM", Locale("tr", "TR")).format(Date(it.snapshotDate)) })
-        } else {
-            container.addView(TextView(this).apply {
-                text = "Günlük portföy geçmişi ilk günlük kayıt oluşturulduğunda burada görünecek."
-                textSize = 12f
-                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
-                setPadding(0, dp(12), 0, dp(12))
-            })
-        }
-
-        container.addView(TextView(this).apply {
-            text = "Bilgi: Günlük portföy geçmişi bu sürümle kaydedilir; grafik yeni kayıtlar biriktikçe uzar. Önceki tarihlere ait değerler geriye dönük oluşturulmaz."
-            textSize = 12f
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
-            setPadding(0, dp(14), 0, dp(24))
+            text = "Günlük kâr/zarar, bir önceki güne ait kaydedilmiş varlık fiyatlarıyla karşılaştırılır. Bu özellik 4.0 sürümünden itibaren fiyat geçmişi biriktirir; ilk karşılaştırma için en az iki farklı gün fiyat kaydı gerekir."
+            textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(16), 0, dp(24))
         })
     }
 
@@ -846,7 +949,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun parseNumber(raw: String) = raw.trim().replace(" ", "").replace(",", ".").toDoubleOrNull()?.takeIf { it.isFinite() }
     private fun formatNumber(value: Double) = NumberFormat.getNumberInstance(Locale("tr", "TR")).format(value)
-    private fun currency(value: Double) = NumberFormat.getCurrencyInstance(Locale("tr", "TR")).format(value)
+    private fun currency(value: Double, code: String = "TRY") = NumberFormat.getCurrencyInstance(Locale("tr", "TR")).apply { currency = java.util.Currency.getInstance(code.uppercase(Locale.ROOT)) }.format(value)
+    private fun sourceLabel(source: String) = when(source.uppercase()) { "YAHOO_FINANCE" -> "Yahoo Finance"; "COINGECKO" -> "CoinGecko"; "FRANKFURTER" -> "Frankfurter"; "MANUAL" -> "Elle giriş"; else -> "Otomatik" }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {
