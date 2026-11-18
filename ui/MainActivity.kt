@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupNavigation() {
         val root = binding.root
-        val pages = listOf(NAV_ASSETS, NAV_TRADES, NAV_DIVIDENDS, NAV_ANALYTICS, NAV_EXPORT)
+        val pages = listOf(NAV_ASSETS, NAV_TRADES, NAV_DIVIDENDS, NAV_ANALYTICS, NAV_EXPORT, NAV_MORE)
         pages.forEach { id ->
             val page = ScrollView(this).apply {
                 visibility = View.GONE
@@ -129,8 +129,24 @@ class MainActivity : AppCompatActivity() {
                 setPadding(0, dp(18), 0, dp(18))
                 setLineSpacing(dp(5).toFloat(), 1f)
             }
+            if (id == NAV_DIVIDENDS || id == NAV_EXPORT) {
+                content.addView(Button(this).apply {
+                    text = "‹ Daha"
+                    setOnClickListener { showPage(NAV_MORE) }
+                })
+            }
             content.addView(title)
             content.addView(body)
+            if (id == NAV_MORE) {
+                content.addView(Button(this).apply {
+                    text = "Temettü kayıtları"
+                    setOnClickListener { showPage(NAV_DIVIDENDS) }
+                })
+                content.addView(Button(this).apply {
+                    text = "Excel raporu oluştur"
+                    setOnClickListener { showPage(NAV_EXPORT) }
+                })
+            }
             if (id == NAV_ANALYTICS) {
                 val chartColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 content.addView(chartColumn)
@@ -158,9 +174,8 @@ class MainActivity : AppCompatActivity() {
             menu.add(0, NAV_HOME, 0, "Özet").setIcon(android.R.drawable.ic_menu_view)
             menu.add(0, NAV_ASSETS, 1, "Portföy").setIcon(android.R.drawable.ic_menu_agenda)
             menu.add(0, NAV_TRADES, 2, "İşlemler").setIcon(android.R.drawable.ic_menu_sort_by_size)
-            menu.add(0, NAV_DIVIDENDS, 3, "Temettü").setIcon(android.R.drawable.ic_menu_my_calendar)
-            menu.add(0, NAV_ANALYTICS, 4, "Analiz").setIcon(android.R.drawable.ic_menu_gallery)
-            menu.add(0, NAV_EXPORT, 5, "Rapor").setIcon(android.R.drawable.ic_menu_save)
+            menu.add(0, NAV_ANALYTICS, 3, "Analiz").setIcon(android.R.drawable.ic_menu_gallery)
+            menu.add(0, NAV_MORE, 4, "Daha").setIcon(android.R.drawable.ic_menu_more)
             setOnItemSelectedListener { item ->
                 showPage(item.itemId)
                 true
@@ -180,6 +195,8 @@ class MainActivity : AppCompatActivity() {
     private fun showPage(id: Int) {
         dashboardView.visibility = if (id == NAV_HOME) View.VISIBLE else View.GONE
         pageViews.forEach { (pageId, view) -> view.visibility = if (pageId == id) View.VISIBLE else View.GONE }
+        val selectedNavId = if (id == NAV_DIVIDENDS || id == NAV_EXPORT) NAV_MORE else id
+        bottomNavigation.menu.findItem(selectedNavId)?.isChecked = true
         binding.fabAddAsset.visibility = if (id == NAV_HOME || id == NAV_ASSETS) View.VISIBLE else View.GONE
         updatePageContent()
     }
@@ -208,6 +225,8 @@ class MainActivity : AppCompatActivity() {
             "${d.ticker} • $date\nBrüt: ${currency(d.grossAmount)}   Stopaj: ${currency(d.withholdingTax)}\nNet temettü: ${currency(d.netAmount)}"
         }
         renderAnalytics()
+        pageTexts[NAV_MORE]?.text =
+            "Diğer çalışma alanları burada. Temettü kayıtlarını görüntüleyin veya portföyünüzü Excel çalışma kitabı olarak dışa aktarın."
         pageTexts[NAV_EXPORT]?.text =
             "Rapor dosyası Android'in dosya kaydetme penceresiyle seçtiğiniz konuma kaydedilir.\n\nExcel çalışma kitabı:\n• Portföy: adet, ortalama maliyet, son fiyat, piyasa değeri ve kâr/zarar\n• İşlemler: alış/satış, komisyon ve gerçekleşen kâr/zarar\n• Temettüler: brüt, stopaj ve net tutar\n\nKayıtlar cihazınızdaki yerel veritabanından alınır; internet gerekmez."
     }
@@ -295,6 +314,7 @@ class MainActivity : AppCompatActivity() {
         NAV_TRADES -> "İşlem geçmişi"
         NAV_DIVIDENDS -> "Temettüler"
         NAV_ANALYTICS -> "Portföy analizi"
+        NAV_MORE -> "Diğer sayfalar"
         else -> "Raporlar ve dışa aktarma"
     }
 
@@ -394,5 +414,6 @@ class MainActivity : AppCompatActivity() {
         private const val NAV_DIVIDENDS = 4
         private const val NAV_ANALYTICS = 5
         private const val NAV_EXPORT = 6
+        private const val NAV_MORE = 7
     }
 }
