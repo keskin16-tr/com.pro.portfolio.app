@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="asset_category_labels">
+        <item>Hisse (BIST)</item>
+        <item>Yatırım Fonu</item>
+        <item>Kripto Para</item>
+        <item>Döviz</item>
+        <item>Altın</item>
+        <item>Emtia</item>
+        <item>Tahvil / Bono</item>
+        <item>Nakit</item>
+        <item>Diğer</item>
+    </string-array>
+    <string-array name="broker_names">
+        <item>Belirtilmedi</item>
+        <item>İş Yatırım</item>
+        <item>Garanti BBVA Yatırım</item>
+        <item>Yapı Kredi Yatırım</item>
+        <item>Ak Yatırım</item>
+        <item>Ziraat Yatırım</item>
+        <item>QNB Invest</item>
+        <item>Midas</item>
+        <item>PhillipCapital</item>
+        <item>A1 Capital</item>
+        <item>Diğer</item>
+    </string-array>
+</resources>

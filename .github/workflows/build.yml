@@ -1,19 +1,15 @@
 name: Portfolio Pro Android APK
-
 on:
   push:
-    branches: [main, portfolio-pro-3.0]
+    branches: [main, portfolio-pro-3.0, portfolio-pro-3.1, portfolio-pro-3.2, portfolio-pro-3.3, portfolio-pro-3.4, portfolio-pro-3.5, portfolio-pro-3.6, portfolio-pro-3.7, portfolio-pro-3.8]
   pull_request:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   build:
     name: Build and verify APK
@@ -33,6 +29,8 @@ jobs:
           gradle-version: '8.7'
       - name: Build debug APK
         run: gradle --no-daemon --stacktrace assembleDebug
+      - name: Verify APK output
+        run: test -s app/build/outputs/apk/debug/app-debug.apk
       - name: Upload APK
         uses: actions/upload-artifact@v5
         with:
