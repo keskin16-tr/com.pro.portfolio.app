@@ -59,12 +59,12 @@ object ExcelExporter {
             """.trimIndent())
 
             val holdingsRows = mutableListOf<List<Any?>>()
-            holdingsRows += listOf("Sembol", "Varlık", "Kategori", "Portföy", "Adet", "Ortalama Maliyet", "Son Fiyat", "Piyasa Değeri", "Maliyet Tutarı", "Kâr/Zarar", "Para Birimi")
+            holdingsRows += listOf("Sembol", "Varlık", "Kategori", "Portföy", "Adet", "Ortalama Maliyet", "Son Fiyat", "Piyasa Değeri", "Maliyet Tutarı", "Kâr/Zarar", "Para Birimi", "Aracı Kurum")
             assets.forEach { a ->
                 val price = a.lastPrice ?: a.costPrice
                 holdingsRows += listOf(a.ticker, a.name, a.category, a.portfolioName, a.quantity,
                     a.costPrice, price, a.quantity * price, a.quantity * a.costPrice,
-                    a.quantity * (price - a.costPrice), a.currency)
+                    a.quantity * (price - a.costPrice), a.currency, a.broker)
             }
             val tradeRows = mutableListOf<List<Any?>>()
             tradeRows += listOf("Tarih", "Sembol", "İşlem", "Miktar", "Birim Fiyat", "Tutar", "Komisyon", "Gerçekleşen K/Z", "Not")
