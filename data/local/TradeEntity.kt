@@ -1,4 +1,5 @@
 package com.portfolio.app.data.local
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -13,5 +14,6 @@ data class TradeEntity(
  val fee:Double=0.0,
  val realizedProfit:Double=0.0,
  val executedAt:Long=System.currentTimeMillis(),
- val note:String=""
+ val note:String="",
+ @ColumnInfo(defaultValue="'TRY'") val currency:String="TRY"
 )
