@@ -8,7 +8,7 @@ import com.portfolio.app.data.local.AssetEntity
 import com.portfolio.app.databinding.ItemAssetBinding
 import java.text.NumberFormat
 import java.util.Locale
-class AssetAdapter(private val onDeleteClick:(AssetEntity)->Unit):ListAdapter<AssetEntity,AssetAdapter.AssetViewHolder>(AssetDiffCallback()){
+class AssetAdapter(private val onDeleteClick:(AssetEntity)->Unit, private val onEditClick:(AssetEntity)->Unit):ListAdapter<AssetEntity,AssetAdapter.AssetViewHolder>(AssetDiffCallback()){
  inner class AssetViewHolder(private val binding:ItemAssetBinding):RecyclerView.ViewHolder(binding.root){
   fun bind(asset:AssetEntity){
    binding.tvAssetName.text=asset.name
@@ -19,6 +19,7 @@ class AssetAdapter(private val onDeleteClick:(AssetEntity)->Unit):ListAdapter<As
    val invested=asset.quantity*asset.costPrice
    binding.tvTotalCost.text=if(marketValue!=null) "Değer "+currency(marketValue)+" • K/Z "+currency(marketValue-invested) else "Maliyet "+currency(invested)+" • Piyasa verisi bekleniyor"
    binding.btnDelete.setOnClickListener{onDeleteClick(asset)}
+   binding.btnEditAsset.setOnClickListener{onEditClick(asset)}
   }
  }
  override fun onCreateViewHolder(parent:ViewGroup,viewType:Int):AssetViewHolder=AssetViewHolder(ItemAssetBinding.inflate(LayoutInflater.from(parent.context),parent,false))
