@@ -73,6 +73,10 @@ class PortfolioRepository(private val database:AppDatabase){
   }
   return added to skipped
  }
+ suspend fun classifyAsset(assetId:Long,category:String,broker:String){
+  require(category.isNotBlank()&&broker.isNotBlank())
+  assetDao.updateClassification(assetId,category,broker)
+ }
  suspend fun recordDailySnapshot(){
   val assets=assetDao.getAssetsOnce()
   if(assets.isEmpty()) return
