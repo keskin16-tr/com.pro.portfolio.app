@@ -727,16 +727,35 @@ class MainActivity : AppCompatActivity() {
         val labels = listOf("Hisse (BIST)", "Yatırım Fonu", "Kripto", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Nakit", "Diğer")
         val category = android.widget.Spinner(this).apply { adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels); setSelection(categories.indexOf(asset.category).coerceAtLeast(0)) }
         val broker = field("Aracı kurum", asset.broker)
+        val hasTrades = currentTrades.any { it.assetId == asset.id }
+        val quantity = if (!hasTrades) field("Miktar", asset.quantity.toString()) else null
+        val cost = if (!hasTrades) field("Ortalama maliyet", asset.costPrice.toString()) else null
         box.addView(name); box.addView(ticker); box.addView(TextView(this).apply { text = "Kategori"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, 0) }); box.addView(category); box.addView(broker)
+        if (hasTrades) {
+            box.addView(TextView(this).apply {
+                text = "Bu varlığın işlem geçmişi var. Miktar ve ortalama maliyet, İşlemler sayfasındaki alış/satış kayıtları düzenlenerek otomatik hesaplanır."
+                textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(10), 0, 0)
+            })
+        } else {
+            box.addView(quantity); box.addView(cost)
+        }
         androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Varlığı düzenle").setView(box)
             .setNegativeButton("İptal", null).setPositiveButton("Kaydet") { _, _ ->
                 val newName = name.text.toString().trim(); val newTicker = ticker.text.toString().trim().uppercase(Locale.ROOT)
                 val newBroker = broker.text.toString().trim().ifBlank { "Belirtilmedi" }
                 if (newName.isBlank() || newTicker.isBlank()) Toast.makeText(this, "Ad ve sembol boş olamaz.", Toast.LENGTH_LONG).show()
-                else viewModel.updateAssetDetails(asset.id, newName, newTicker, categories[category.selectedItemPosition], newBroker) { result -> runOnUiThread {
+                else {
+                    val newQuantity = quantity?.let { parseNumber(it.text.toString()) }
+                    val newCost = cost?.let { parseNumber(it.text.toString()) }
+                    if (!hasTrades && (newQuantity == null || newQuantity < 0.0 || newCost == null || newCost < 0.0)) {
+                        Toast.makeText(this, "Miktar ve ortalama maliyeti kontrol edin.", Toast.LENGTH_LONG).show()
+                        return@setPositiveButton
+                    }
+                    viewModel.updateAssetDetails(asset.id, newName, newTicker, categories[category.selectedItemPosition], newBroker, newQuantity, newCost) { result -> runOnUiThread {
                     result.onSuccess { Toast.makeText(this, "Varlık bilgileri güncellendi.", Toast.LENGTH_SHORT).show() }
                         .onFailure { Toast.makeText(this, it.message ?: "Varlık güncellenemedi.", Toast.LENGTH_LONG).show() }
                 } }
+                }
             }.show()
     }
 
