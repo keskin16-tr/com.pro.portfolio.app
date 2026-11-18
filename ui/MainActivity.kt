@@ -297,47 +297,44 @@ class MainActivity : AppCompatActivity() {
     private fun updatePageContent() {
         pageTexts[NAV_ASSETS]?.text = if (currentAssets.isEmpty()) {
             "Henüz portföy varlığı eklenmedi."
-        } else currentAssets.joinToString("\n\n") { a ->
-            val price = a.lastPrice ?: a.costPrice
-            val value = a.quantity * price
-            val pnl = (price - a.costPrice) * a.quantity
-            "${a.ticker} — ${a.name}\nAdet: ${formatNumber(a.quantity)}   •   Ortalama maliyet: ${currency(a.costPrice)}\nSon fiyat: ${currency(price)}   •   Piyasa değeri: ${currency(value)}\nKâr/Zarar: ${currency(pnl)}"
+        } else currentAssets.joinToString("\n\n") { asset ->
+            val price = asset.lastPrice ?: asset.costPrice
+            val value = asset.quantity * price
+            val pnl = (price - asset.costPrice) * asset.quantity
+            "${asset.ticker} — ${asset.name}\nKategori: ${categoryLabel(asset.category)} • Aracı kurum: ${asset.broker}\nAdet: ${formatNumber(asset.quantity)} • Ortalama maliyet: ${currency(asset.costPrice)}\nSon fiyat: ${currency(price)} • Piyasa değeri: ${currency(value)}\nKâr/Zarar: ${currency(pnl)}"
         }
         pageTexts[NAV_TRADES]?.text = if (currentTrades.isEmpty()) {
             "Henüz alış veya satış işlemi bulunmuyor."
-        } else currentTrades.joinToString("\n\n") { t ->
-            val symbol = currentAssets.firstOrNull { it.id == t.assetId }?.ticker ?: "Varlık #${t.assetId}"
-            val date = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR")).format(Date(t.executedAt))
-            "${if (t.action == "SELL") "SATIŞ" else "ALIŞ"} • $symbol\n$date\nMiktar: ${formatNumber(t.quantity)} × ${currency(t.unitPrice)}\nKomisyon: ${currency(t.fee)}" +
-                if (t.action == "SELL") "\nGerçekleşen K/Z: ${currency(t.realizedProfit)}" else ""
+        } else currentTrades.joinToString("\n\n") { trade ->
+            val symbol = currentAssets.firstOrNull { it.id == trade.assetId }?.ticker ?: "Varlık #${trade.assetId}"
+            val date = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR")).format(Date(trade.executedAt))
+            "${if (trade.action == "SELL") "SATIŞ" else "ALIŞ"} • $symbol\n$date\nMiktar: ${formatNumber(trade.quantity)} × ${currency(trade.unitPrice)}\nKomisyon: ${currency(trade.fee)}" +
+                if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit)}" else ""
         }
         pageTexts[NAV_DIVIDENDS]?.text = if (currentDividends.isEmpty()) {
             "Henüz temettü kaydı bulunmuyor."
-        } else currentDividends.joinToString("\n\n") { d ->
-            val date = SimpleDateFormat("dd.MM.yyyy", Locale("tr", "TR")).format(Date(d.paymentDate))
-            "${d.ticker} • $date\nBrüt: ${currency(d.grossAmount)}   Stopaj: ${currency(d.withholdingTax)}\nNet temettü: ${currency(d.netAmount)}"
+        } else currentDividends.joinToString("\n\n") { dividend ->
+            val date = SimpleDateFormat("dd.MM.yyyy", Locale("tr", "TR")).format(Date(dividend.paymentDate))
+            "${dividend.ticker} • $date\nBrüt: ${currency(dividend.grossAmount)} • Stopaj: ${currency(dividend.withholdingTax)}\nNet temettü: ${currency(dividend.netAmount)}"
         }
-        renderAnalytics()
-        pageTexts[NAV_MORE]?.text =
-            "Diğer çalışma alanları burada. Temettü kayıtlarını görüntüleyin veya portföyünüzü Excel çalışma kitabı olarak dışa aktarın."
         pageTexts[NAV_CATEGORIES]?.text = currentAssets.groupBy { it.category }.entries
             .sortedByDescending { entry -> entry.value.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
             .joinToString("\n\n") { (category, assets) ->
                 "${categoryLabel(category)} • ${assets.size} varlık\nToplam değer: ${currency(assets.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) })}"
             }.ifBlank { "Kategori dağılımı için portföye varlık ekleyin." }
         pageTexts[NAV_BROKERS]?.text = currentAssets.groupBy { it.broker.ifBlank { "Belirtilmedi" } }
-            .entries.sortedByDescending { it.value.sumOf { a -> a.quantity * (a.lastPrice ?: a.costPrice) } }
+            .entries.sortedByDescending { entry -> entry.value.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
             .joinToString("\n\n") { (broker, assets) ->
-                "${broker} • ${assets.size} varlık\nToplam değer: ${currency(assets.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) })}"
+                "$broker • ${assets.size} varlık\nToplam değer: ${currency(assets.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) })}"
             }.ifBlank { "Aracı kurum dağılımı için portföye varlık ekleyin." }
         pageTexts[NAV_IMPORT]?.text =
-            "Excel (.xlsx) dosyanızın ilk sayfasında Sembol, Varlık, Kategori, Adet ve Ortalama Maliyet sütunları bulunmalı.\n\nPortfolio Pro'nun dışa aktardığı dosyalar doğrudan içe aktarılabilir. Aynı sembol portföyde zaten varsa tekrar eklenmez. İçe aktarma öncesi kayıtların önizlemesi gösterilir."
+            "Excel (.xlsx) dosyasının ilk sayfasında Sembol, Varlık, Kategori, Adet ve Ortalama Maliyet sütunları bulunmalı.\n\nPortfolio Pro dışa aktarma dosyaları doğrudan içe aktarılabilir. Aynı sembol portföyde zaten varsa tekrar eklenmez. İçe aktarma öncesi önizleme gösterilir."
         pageTexts[NAV_MORE]?.text =
             "Kategori ve aracı kurum dağılımlarını inceleyin; temettü kayıtlarına ulaşın veya Excel dosyalarını içe/dışa aktarın."
         pageTexts[NAV_EXPORT]?.text =
-            "Excel çalışma kitabı: Portföy, İşlemler ve Temettüler sayfalarını içerir. Portföy sayfasında kategori ve aracı kurum bilgileri de bulunur. Kayıtlar cihazınızdaki yerel veritabanından alınır."\n\nExcel çalışma kitabı:\n• Portföy: adet, ortalama maliyet, son fiyat, piyasa değeri ve kâr/zarar\n• İşlemler: alış/satış, komisyon ve gerçekleşen kâr/zarar\n• Temettüler: brüt, stopaj ve net tutar\n\nKayıtlar cihazınızdaki yerel veritabanından alınır; internet gerekmez."
+            "Excel çalışma kitabı Portföy, İşlemler ve Temettüler sayfalarını içerir. Portföy sayfasında kategori ve aracı kurum bilgileri de bulunur. Kayıtlar cihazınızdaki yerel veritabanından alınır."
+        renderAnalytics()
     }
-
 
     private fun renderAnalytics() {
         val container = analyticsContainer ?: return
