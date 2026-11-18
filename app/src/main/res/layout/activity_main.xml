@@ -317,7 +317,7 @@
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
                         android:gravity="center"
-                        android:text="Dağılım grafiği için\nvarlık ekleyin"
+                        android:text="TL dağılım grafiği için\nTL cinsinden varlık ekleyin"
                         android:textColor="@color/portfolio_muted"
                         android:textSize="13sp" />
                 </FrameLayout>
