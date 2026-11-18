@@ -28,7 +28,12 @@ class MainViewModel(application:Application):AndroidViewModel(application){
  init{
   viewModelScope.launch{
    while(isActive){
-    database.assetDao().getAssetsOnce().forEach{asset->marketData.fetchQuote(asset)?.let{repository.updatePrice(asset.id,it.price,it.updatedAt)}}
+    val latestAssets=runCatching { database.assetDao().getAssetsOnce() }.getOrDefault(emptyList())
+    latestAssets.forEach{asset->
+     runCatching { marketData.fetchQuote(asset) }.getOrNull()?.let{quote->
+      runCatching { repository.updatePrice(asset.id,quote.price,quote.updatedAt) }
+     }
+    }
     runCatching { repository.recordDailySnapshot() }
     delay(60_000L)
    }
