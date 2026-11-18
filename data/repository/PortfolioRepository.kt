@@ -83,12 +83,12 @@ class PortfolioRepository(private val database:AppDatabase){
   val cleanTicker=ticker.trim().uppercase()
   assetDao.updateAssetDetails(assetId,name.trim(),cleanTicker,category,broker,defaultMarketSymbol(cleanTicker,category))
  }
- suspend fun editTrade(tradeId:Long,action:String,quantity:Double,unitPrice:Double,fee:Double,note:String){
+ suspend fun editTrade(tradeId:Long,action:String,quantity:Double,unitPrice:Double,fee:Double,note:String,executedAt:Long){
   require(action=="BUY"||action=="SELL")
   require(quantity>0.0&&unitPrice>=0.0&&fee>=0.0)
   database.withTransaction{
    val current=tradeDao.getById(tradeId)?:error("İşlem bulunamadı")
-   tradeDao.update(current.copy(action=action,quantity=quantity,unitPrice=unitPrice,fee=fee,note=note))
+   tradeDao.update(current.copy(action=action,quantity=quantity,unitPrice=unitPrice,fee=fee,note=note,executedAt=executedAt))
    recalculateAsset(current.assetId)
   }
  }
