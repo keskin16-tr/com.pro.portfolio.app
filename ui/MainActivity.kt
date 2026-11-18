@@ -54,6 +54,7 @@ class MainActivity : AppCompatActivity() {
     private var analyticsContainer: LinearLayout? = null
     private val pageViews = mutableMapOf<Int, View>()
     private val pageTexts = mutableMapOf<Int, TextView>()
+    private val pageLists = mutableMapOf<Int, LinearLayout>()
     private val pageClockViews = mutableListOf<TextView>()
     private var currentAssets: List<AssetEntity> = emptyList()
     private var currentTrades: List<TradeEntity> = emptyList()
@@ -94,6 +95,8 @@ class MainActivity : AppCompatActivity() {
         binding.btnTopSell.setOnClickListener { showSellDialog() }
         binding.btnTopImportExcel.setOnClickListener { launchExcelImport() }
         binding.btnTopAddDividend.setOnClickListener { showDividendDialog() }
+        binding.btnTopManageAssets.setOnClickListener { showPage(NAV_ASSETS) }
+        binding.btnTopManageTrades.setOnClickListener { showPage(NAV_TRADES) }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -222,6 +225,12 @@ class MainActivity : AppCompatActivity() {
                     setOnClickListener { showPage(NAV_MORE) }
                 })
             }
+            if (id == NAV_ASSETS || id == NAV_TRADES) {
+                val shortcuts = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                shortcuts.addView(actionButton("Portföy", R.color.portfolio_blue) { showPage(NAV_ASSETS) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginEnd = dp(6) })
+                shortcuts.addView(actionButton("İşlemler", R.color.portfolio_orange) { showPage(NAV_TRADES) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(6) })
+                content.addView(shortcuts)
+            }
             content.addView(title)
             val pageClock = TextView(this).apply {
                 textSize = 12f
@@ -232,6 +241,11 @@ class MainActivity : AppCompatActivity() {
             pageClockViews += pageClock
             content.addView(pageClock)
             content.addView(body)
+            if (id == NAV_ASSETS || id == NAV_TRADES) {
+                val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                content.addView(list)
+                pageLists[id] = list
+            }
             if (id == NAV_MORE) {
                 content.addView(actionButton("Kategori dağılımı", R.color.portfolio_blue) { showPage(NAV_CATEGORIES) })
                 content.addView(actionButton("Mevcut varlıkları sınıflandır", R.color.portfolio_orange) { showClassificationDialog() })
@@ -307,7 +321,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updatePageContent() {
-        pageTexts[NAV_ASSETS]?.text = if (currentAssets.isEmpty()) {
+        pageTexts[NAV_ASSETS]?.text = ""
+        renderAssetManagement()
+        pageTexts[NAV_TRADES]?.text = ""
+        renderTradeManagement()
+        /* legacy summary text disabled: management cards provide per-record actions */
+        /* pageTexts[NAV_ASSETS]?.text = if (currentAssets.isEmpty()) {
             "Henüz portföy varlığı eklenmedi."
         } else currentAssets.joinToString("\n\n") { asset ->
             val price = asset.lastPrice ?: asset.costPrice
@@ -323,6 +342,7 @@ class MainActivity : AppCompatActivity() {
             "${if (trade.action == "SELL") "SATIŞ" else "ALIŞ"} • $symbol\n$date\nMiktar: ${formatNumber(trade.quantity)} × ${currency(trade.unitPrice)}\nKomisyon: ${currency(trade.fee)}" +
                 if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit)}" else ""
         }
+        */
         pageTexts[NAV_DIVIDENDS]?.text = if (currentDividends.isEmpty()) {
             "Henüz temettü kaydı bulunmuyor."
         } else currentDividends.joinToString("\n\n") { dividend ->
@@ -618,8 +638,137 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun renderAssetManagement() {
+        val list = pageLists[NAV_ASSETS] ?: return
+        list.removeAllViews()
+        if (currentAssets.isEmpty()) {
+            list.addView(TextView(this).apply { text = "Henüz varlık yok. Üstteki Varlık ekle butonunu kullanın."; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(12), 0, dp(12)) })
+            return
+        }
+        currentAssets.forEach { asset ->
+            val card = com.google.android.material.card.MaterialCardView(this).apply {
+                radius = dp(16).toFloat()
+                cardBackgroundColor = ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface)
+                strokeColor = ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue)
+                strokeWidth = dp(1)
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
+            }
+            val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(14), dp(16), dp(14)) }
+            val value = asset.quantity * (asset.lastPrice ?: asset.costPrice)
+            column.addView(TextView(this).apply {
+                text = "${asset.ticker} — ${asset.name}"
+                textSize = 16f; typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+            })
+            column.addView(TextView(this).apply {
+                text = "${categoryLabel(asset.category)} • ${asset.broker}\nMiktar: ${formatNumber(asset.quantity)} • Ort. maliyet: ${currency(asset.costPrice)}\nPiyasa değeri: ${currency(value)}"
+                textSize = 13f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(6), 0, dp(10))
+            })
+            val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            actions.addView(actionButton("Düzenle", R.color.portfolio_blue) { showEditAssetDialog(asset) }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginEnd = dp(6) })
+            actions.addView(actionButton("Sil", R.color.portfolio_orange) {
+                androidx.appcompat.app.AlertDialog.Builder(this@MainActivity).setTitle("Varlığı sil")
+                    .setMessage("${asset.ticker} varlığı ve ilişkili işlem/temettü kayıtları silinecek. Devam edilsin mi?")
+                    .setNegativeButton("Vazgeç", null).setPositiveButton("Sil") { _, _ -> viewModel.deleteAsset(asset) }.show()
+            }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginStart = dp(6) })
+            column.addView(actions); card.addView(column); list.addView(card)
+        }
+    }
+
+    private fun renderTradeManagement() {
+        val list = pageLists[NAV_TRADES] ?: return
+        list.removeAllViews()
+        if (currentTrades.isEmpty()) {
+            list.addView(TextView(this).apply { text = "Henüz işlem yok. Alış veya satış işlemi ekleyebilirsiniz."; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(12), 0, dp(12)) })
+            return
+        }
+        val assets = currentAssets.associateBy { it.id }
+        val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
+        currentTrades.forEach { trade ->
+            val symbol = assets[trade.assetId]?.ticker ?: "Varlık #${trade.assetId}"
+            val card = com.google.android.material.card.MaterialCardView(this).apply {
+                radius = dp(16).toFloat(); cardBackgroundColor = ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface)
+                strokeColor = ContextCompat.getColor(this@MainActivity, if (trade.action == "SELL") R.color.portfolio_orange else R.color.portfolio_green)
+                strokeWidth = dp(1); layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
+            }
+            val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(14), dp(16), dp(14)) }
+            column.addView(TextView(this).apply {
+                text = "${if (trade.action == "SELL") "SATIŞ" else "ALIŞ"} • $symbol"
+                textSize = 16f; typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(this@MainActivity, if (trade.action == "SELL") R.color.portfolio_orange else R.color.portfolio_green))
+            })
+            column.addView(TextView(this).apply {
+                text = "${dateFormat.format(Date(trade.executedAt))}\nMiktar: ${formatNumber(trade.quantity)} × ${currency(trade.unitPrice)}\nKomisyon: ${currency(trade.fee)}" +
+                    if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit)}" else ""
+                textSize = 13f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(6), 0, dp(10))
+            })
+            val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            actions.addView(actionButton("İşlemi düzenle", R.color.portfolio_blue) { showEditTradeDialog(trade) }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginEnd = dp(6) })
+            actions.addView(actionButton("Sil", R.color.portfolio_orange) {
+                androidx.appcompat.app.AlertDialog.Builder(this@MainActivity).setTitle("İşlemi sil")
+                    .setMessage("Bu işlem silinince varlık miktarı, ortalama maliyet ve gerçekleşen kâr/zarar yeniden hesaplanacak.")
+                    .setNegativeButton("Vazgeç", null).setPositiveButton("Sil") { _, _ ->
+                        viewModel.deleteTrade(trade.id) { result -> runOnUiThread {
+                            result.onSuccess { Toast.makeText(this@MainActivity, "İşlem silindi ve portföy yeniden hesaplandı.", Toast.LENGTH_LONG).show() }
+                                .onFailure { Toast.makeText(this@MainActivity, it.message ?: "İşlem silinemedi.", Toast.LENGTH_LONG).show() }
+                        } }
+                    }.show()
+            }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginStart = dp(6) })
+            column.addView(actions); card.addView(column); list.addView(card)
+        }
+    }
+
+    private fun showEditAssetDialog(asset: AssetEntity) {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(8), dp(22), 0) }
+        fun field(hint: String, value: String) = android.widget.EditText(this).apply { this.hint = hint; setText(value); singleLine = true }
+        val name = field("Varlık adı", asset.name)
+        val ticker = field("Sembol", asset.ticker)
+        val categories = listOf("STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
+        val labels = listOf("Hisse (BIST)", "Yatırım Fonu", "Kripto", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Nakit", "Diğer")
+        val category = android.widget.Spinner(this).apply { adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels); setSelection(categories.indexOf(asset.category).coerceAtLeast(0)) }
+        val broker = field("Aracı kurum", asset.broker)
+        box.addView(name); box.addView(ticker); box.addView(TextView(this).apply { text = "Kategori"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, 0) }); box.addView(category); box.addView(broker)
+        androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Varlığı düzenle").setView(box)
+            .setNegativeButton("İptal", null).setPositiveButton("Kaydet") { _, _ ->
+                val newName = name.text.toString().trim(); val newTicker = ticker.text.toString().trim().uppercase(Locale.ROOT)
+                val newBroker = broker.text.toString().trim().ifBlank { "Belirtilmedi" }
+                if (newName.isBlank() || newTicker.isBlank()) Toast.makeText(this, "Ad ve sembol boş olamaz.", Toast.LENGTH_LONG).show()
+                else viewModel.updateAssetDetails(asset.id, newName, newTicker, categories[category.selectedItemPosition], newBroker) { result -> runOnUiThread {
+                    result.onSuccess { Toast.makeText(this, "Varlık bilgileri güncellendi.", Toast.LENGTH_SHORT).show() }
+                        .onFailure { Toast.makeText(this, it.message ?: "Varlık güncellenemedi.", Toast.LENGTH_LONG).show() }
+                } }
+            }.show()
+    }
+
+    private fun showEditTradeDialog(trade: TradeEntity) {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(8), dp(22), 0) }
+        val action = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Alış", "Satış"))
+            setSelection(if (trade.action == "SELL") 1 else 0)
+        }
+        fun field(hint: String, value: String) = android.widget.EditText(this).apply {
+            this.hint = hint; setText(value); singleLine = true
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+        }
+        val quantity = field("Miktar", trade.quantity.toString())
+        val price = field("Birim fiyat", trade.unitPrice.toString())
+        val fee = field("Komisyon", trade.fee.toString())
+        val note = android.widget.EditText(this).apply { hint = "Not"; setText(trade.note); singleLine = true; inputType = android.text.InputType.TYPE_CLASS_TEXT }
+        box.addView(TextView(this).apply { text = "İşlem türü"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)) })
+        box.addView(action); box.addView(quantity); box.addView(price); box.addView(fee); box.addView(note)
+        androidx.appcompat.app.AlertDialog.Builder(this).setTitle("İşlemi düzenle").setView(box)
+            .setNegativeButton("İptal", null).setPositiveButton("Kaydet") { _, _ ->
+                val qty = parseNumber(quantity.text.toString()); val unitPrice = parseNumber(price.text.toString()); val commission = parseNumber(fee.text.toString()) ?: 0.0
+                if (qty == null || qty <= 0.0 || unitPrice == null || unitPrice < 0.0 || commission < 0.0) Toast.makeText(this, "Miktar, fiyat ve komisyon değerlerini kontrol edin.", Toast.LENGTH_LONG).show()
+                else viewModel.editTrade(trade.id, if (action.selectedItemPosition == 1) "SELL" else "BUY", qty, unitPrice, commission, note.text.toString()) { result -> runOnUiThread {
+                    result.onSuccess { Toast.makeText(this, "İşlem güncellendi; portföy ve kâr/zarar yeniden hesaplandı.", Toast.LENGTH_LONG).show() }
+                        .onFailure { Toast.makeText(this, it.message ?: "İşlem güncellenemedi.", Toast.LENGTH_LONG).show() }
+                } }
+            }.show()
+    }
+
     private fun setupRecyclerView() {
-        assetAdapter = AssetAdapter { asset -> viewModel.deleteAsset(asset) }
+        assetAdapter = AssetAdapter({ asset -> viewModel.deleteAsset(asset) }, { asset -> showEditAssetDialog(asset) })
         binding.recyclerViewAssets.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = assetAdapter
