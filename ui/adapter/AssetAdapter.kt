@@ -12,7 +12,7 @@ class AssetAdapter(private val onDeleteClick:(AssetEntity)->Unit):ListAdapter<As
  inner class AssetViewHolder(private val binding:ItemAssetBinding):RecyclerView.ViewHolder(binding.root){
   fun bind(asset:AssetEntity){
    binding.tvAssetName.text=asset.name
-   binding.tvAssetTicker.text=asset.ticker.uppercase(Locale.ROOT)
+   binding.tvAssetTicker.text="${asset.ticker.uppercase(Locale.ROOT)} • ${categoryLabel(asset.category)} • ${asset.broker}"
    binding.tvAssetQuantity.text="Miktar: "+formatNumber(asset.quantity)
    binding.tvAssetCost.text="Ort. maliyet: "+currency(asset.costPrice)
    val marketValue=asset.lastPrice?.times(asset.quantity)
@@ -23,6 +23,17 @@ class AssetAdapter(private val onDeleteClick:(AssetEntity)->Unit):ListAdapter<As
  }
  override fun onCreateViewHolder(parent:ViewGroup,viewType:Int):AssetViewHolder=AssetViewHolder(ItemAssetBinding.inflate(LayoutInflater.from(parent.context),parent,false))
  override fun onBindViewHolder(holder:AssetViewHolder,position:Int)=holder.bind(getItem(position))
+ private fun categoryLabel(value:String)=when(value.uppercase()){
+  "STOCK","BIST","HISSE"->"Hisse"
+  "FUND"->"Fon"
+  "CRYPTO"->"Kripto"
+  "FX"->"Döviz"
+  "GOLD"->"Altın"
+  "COMMODITY"->"Emtia"
+  "BOND"->"Tahvil"
+  "CASH"->"Nakit"
+  else->"Diğer"
+ }
  private fun currency(value:Double)=NumberFormat.getCurrencyInstance(Locale("tr","TR")).format(value)
  private fun formatNumber(value:Double)=NumberFormat.getNumberInstance(Locale("tr","TR")).format(value)
  class AssetDiffCallback:DiffUtil.ItemCallback<AssetEntity>(){
