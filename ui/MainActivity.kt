@@ -27,6 +27,7 @@ import com.portfolio.app.data.export.ExcelExporter
 import com.portfolio.app.data.local.AssetEntity
 import com.portfolio.app.data.local.DividendEntity
 import com.portfolio.app.data.local.TradeEntity
+import com.portfolio.app.data.local.PortfolioSnapshotEntity
 import com.portfolio.app.databinding.ActivityMainBinding
 import com.portfolio.app.ui.adapter.AssetAdapter
 import com.portfolio.app.ui.dialog.AddAssetDialogFragment
@@ -48,6 +49,7 @@ class MainActivity : AppCompatActivity() {
     private var currentAssets: List<AssetEntity> = emptyList()
     private var currentTrades: List<TradeEntity> = emptyList()
     private var currentDividends: List<DividendEntity> = emptyList()
+    private var currentSnapshots: List<PortfolioSnapshotEntity> = emptyList()
 
     private val createExcelDocument = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -101,6 +103,11 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.dividends.collect { currentDividends = it; updatePageContent() }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.snapshots.collect { currentSnapshots = it; updatePageContent() }
             }
         }
     }
@@ -289,6 +296,21 @@ class MainActivity : AppCompatActivity() {
         addChart("Temettü nakit akışı", "Son 6 ay • kaydedilmiş net ödemeler",
             com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, monthlyDividends,
             months.map { (month, year) -> String.format(Locale("tr", "TR"), "%02d/%02d", month + 1, year % 100) })
+        val history = currentSnapshots.takeLast(30)
+        if (history.isNotEmpty()) {
+            addChart("Portföy değer geçmişi", "Uygulama açıldığından beri kaydedilen günlük değerler",
+                com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.LINE,
+                history.map { it.marketValue },
+                history.map { SimpleDateFormat("dd.MM", Locale("tr", "TR")).format(Date(it.snapshotDate)) })
+        } else {
+            container.addView(TextView(this).apply {
+                text = "Günlük portföy geçmişi ilk günlük kayıt oluşturulduğunda burada görünecek."
+                textSize = 12f
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                setPadding(0, dp(12), 0, dp(12))
+            })
+        }
+
         container.addView(TextView(this).apply {
             text = "Bilgi: Portföyün geçmiş değerlerini henüz günlük olarak kaydetmiyoruz. Bu nedenle zaman serisi ve BIST 100 karşılaştırması, geçmiş veri kaydı eklendikten sonra etkinleştirilecek."
             textSize = 12f
