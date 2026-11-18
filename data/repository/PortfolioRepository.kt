@@ -247,15 +247,16 @@ class PortfolioRepository(private val database: AppDatabase) {
         priceSnapshotDao.upsert(AssetPriceSnapshotEntity(assetId, day, price, asset.currency))
     }
 
-    suspend fun dailyProfitLoss(currency: String): Double {
+    suspend fun dailyProfitLoss(currency: String): Double? {
         val assets = assetDao.getAssetsOnce().filter { it.currency.equals(currency, true) && it.quantity > 0.0 }
         val today = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }.timeInMillis
-        return assets.sumOf { asset ->
-            val previous = priceSnapshotDao.previousForAsset(asset.id, today)
-            if (previous == null) 0.0 else ((asset.lastPrice ?: asset.costPrice) - previous.price) * asset.quantity
+        val comparable = assets.mapNotNull { asset ->
+            val previous = priceSnapshotDao.previousForAsset(asset.id, today) ?: return@mapNotNull null
+            ((asset.lastPrice ?: asset.costPrice) - previous.price) * asset.quantity
         }
+        return comparable.takeIf { it.isNotEmpty() }?.sum()
     }
 
     private fun defaultMarketSymbol(ticker: String, category: String): String {
