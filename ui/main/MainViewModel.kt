@@ -52,6 +52,7 @@ class MainViewModel(application:Application):AndroidViewModel(application){
    }
   }
  }
+ fun refreshRates(){viewModelScope.launch{runCatching{_rates.value=marketRates.fetchRates()}}}
  fun addAsset(name:String,ticker:String,quantity:Double,costPrice:Double,category:String,broker:String,currency:String,priceSource:String){viewModelScope.launch{runCatching{repository.recordBuy(name,ticker,quantity,costPrice,category=category,currency=currency,broker=broker,priceSource=priceSource)}}}
  fun importHoldings(rows:List<ImportedHolding>,onResult:(Result<Pair<Int,Int>>)->Unit){viewModelScope.launch{onResult(runCatching{repository.importHoldings(rows)})}}
  fun classifyAsset(assetId:Long,category:String,broker:String,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.classifyAsset(assetId,category,broker)})}}
