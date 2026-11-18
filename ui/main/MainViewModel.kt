@@ -7,6 +7,7 @@ import com.portfolio.app.data.local.AssetEntity
 import com.portfolio.app.data.local.DividendEntity
 import com.portfolio.app.data.local.TradeEntity
 import com.portfolio.app.data.local.PortfolioSnapshotEntity
+import com.portfolio.app.data.importer.ImportedHolding
 import com.portfolio.app.data.remote.MarketDataRepository
 import com.portfolio.app.data.repository.PortfolioRepository
 import kotlinx.coroutines.delay
@@ -39,7 +40,8 @@ class MainViewModel(application:Application):AndroidViewModel(application){
    }
   }
  }
- fun addAsset(name:String,ticker:String,quantity:Double,costPrice:Double){viewModelScope.launch{runCatching{repository.recordBuy(name,ticker,quantity,costPrice)}}}
+ fun addAsset(name:String,ticker:String,quantity:Double,costPrice:Double,category:String,broker:String){viewModelScope.launch{runCatching{repository.recordBuy(name,ticker,quantity,costPrice,category=category,broker=broker)}}}
+ fun importHoldings(rows:List<ImportedHolding>,onResult:(Result<Pair<Int,Int>>)->Unit){viewModelScope.launch{onResult(runCatching{repository.importHoldings(rows)})}}
  fun addDividend(ticker:String,grossAmount:Double,taxPercent:Double){viewModelScope.launch{runCatching{repository.recordDividend(ticker,grossAmount,taxPercent)}}}
  fun sellAsset(assetId:Long,quantity:Double,unitPrice:Double,fee:Double,onResult:(Result<Unit>)->Unit){
   viewModelScope.launch{onResult(runCatching{repository.recordSell(assetId,quantity,unitPrice,fee)})}
