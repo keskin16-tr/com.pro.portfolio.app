@@ -136,7 +136,15 @@ object ExcelImporter {
         .replace("Ü", "U").replace("Ö", "O").replace("Ç", "C")
         .replace(Regex("[^A-Z0-9]"), "")
 
-    private fun normalizePriceSource(value: String): String = when (normalize(value)) {\n        "YAHOOFINANCE", "YAHOO" -> "YAHOO_FINANCE"\n        "COINGECKO" -> "COINGECKO"\n        "FRANKFURTER" -> "FRANKFURTER"\n        "MANUEL", "ELLEGIRIS" -> "MANUAL"\n        else -> "AUTO"\n    }\n\n    private fun normalizeCategory(value: String): String = when (normalize(value)) {
+    private fun normalizePriceSource(value: String): String = when (normalize(value)) {
+        "YAHOOFINANCE", "YAHOO" -> "YAHOO_FINANCE"
+        "COINGECKO" -> "COINGECKO"
+        "FRANKFURTER" -> "FRANKFURTER"
+        "MANUEL", "ELLEGIRIS" -> "MANUAL"
+        else -> "AUTO"
+    }
+
+    private fun normalizeCategory(value: String): String = when (normalize(value)) {
         "HISSE", "HISSEBIST", "HISSESENEDI", "STOCK", "BIST" -> "STOCK"
         "AMERIKANBORSALARI", "AMERIKANHISSE", "USSTOCK", "USSTOCKS", "NASDAQ", "NYSE", "USA" -> "US_STOCK"
         "FON", "YATIRIMFONU", "FUND" -> "FUND"
