@@ -58,7 +58,7 @@ object ExcelImporter {
                 ticker, value(nameCol).ifBlank { ticker }, normalizeCategory(value(categoryCol)),
                 value(portfolioCol).ifBlank { "Ana Portföy" }, quantity, cost,
                 lastCol?.let { parseNumber(value(it)) },
-                value(currencyCol).ifBlank { "TRY" }.uppercase(Locale.ROOT),
+                value(currencyCol).ifBlank { if (normalizeCategory(value(categoryCol)) == "US_STOCK") "USD" else "TRY" }.uppercase(Locale.ROOT),
                 value(brokerCol).ifBlank { "Belirtilmedi" }
             )
         }.distinctBy { it.ticker }
@@ -135,6 +135,7 @@ object ExcelImporter {
 
     private fun normalizeCategory(value: String): String = when (normalize(value)) {
         "HISSE", "HISSEBIST", "HISSESENEDI", "STOCK", "BIST" -> "STOCK"
+        "AMERIKANBORSALARI", "AMERIKANHISSE", "USSTOCK", "USSTOCKS", "NASDAQ", "NYSE", "USA" -> "US_STOCK"
         "FON", "YATIRIMFONU", "FUND" -> "FUND"
         "KRIPTO", "KRIPTOPARA", "CRYPTO" -> "CRYPTO"
         "DOVIZ", "FX", "CURRENCY" -> "FX"
