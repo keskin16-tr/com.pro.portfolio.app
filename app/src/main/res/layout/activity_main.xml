@@ -61,6 +61,81 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
+            <TextView
+                android:id="@+id/tvCurrentDateTime"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Tarih ve saat yükleniyor..."
+                android:textColor="@color/portfolio_muted"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopAddAsset"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="Varlık ekle"
+                    android:textColor="@color/portfolio_navy"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_green"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_input_add"
+                    app:iconTint="@color/portfolio_navy" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopSell"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Satış yap"
+                    android:textColor="@color/portfolio_navy"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_orange"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_menu_upload"
+                    app:iconTint="@color/portfolio_navy" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopImportExcel"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="Excel içe aktar"
+                    android:textColor="@color/portfolio_navy"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_blue"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_menu_upload"
+                    app:iconTint="@color/portfolio_navy" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopAddDividend"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Temettü ekle"
+                    android:textColor="@color/portfolio_navy"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_purple"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_menu_my_calendar"
+                    app:iconTint="@color/portfolio_navy" />
+            </LinearLayout>
+
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
