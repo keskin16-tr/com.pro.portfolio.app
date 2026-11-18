@@ -6,6 +6,7 @@ import com.portfolio.app.data.local.AppDatabase
 import com.portfolio.app.data.local.AssetEntity
 import com.portfolio.app.data.local.DividendEntity
 import com.portfolio.app.data.local.TradeEntity
+import com.portfolio.app.data.local.PortfolioSnapshotEntity
 import com.portfolio.app.data.remote.MarketDataRepository
 import com.portfolio.app.data.repository.PortfolioRepository
 import kotlinx.coroutines.delay
@@ -23,10 +24,12 @@ class MainViewModel(application:Application):AndroidViewModel(application){
  val tradeCount:StateFlow<Int> = repository.tradeCount.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),0)
  val dividends:StateFlow<List<DividendEntity>> = repository.allDividends.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),emptyList())
  val totalDividends:StateFlow<Double> = repository.totalNetDividends.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),0.0)
+ val snapshots:StateFlow<List<PortfolioSnapshotEntity>> = repository.allSnapshots.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),emptyList())
  init{
   viewModelScope.launch{
    while(isActive){
     database.assetDao().getAssetsOnce().forEach{asset->marketData.fetchQuote(asset)?.let{repository.updatePrice(asset.id,it.price,it.updatedAt)}}
+    runCatching { repository.recordDailySnapshot() }
     delay(60_000L)
    }
   }
