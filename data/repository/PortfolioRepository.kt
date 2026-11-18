@@ -78,10 +78,13 @@ class PortfolioRepository(private val database:AppDatabase){
   assetDao.updateClassification(assetId,category,broker)
  }
 
- suspend fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String,quantity:Double?=null,costPrice:Double?=null,currency:String="TRY",priceSource:String="AUTO"){
+ suspend fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String,quantity:Double?=null,costPrice:Double?=null,currency:String="TRY",priceSource:String="AUTO",manualPrice:Double?=null){
   require(name.isNotBlank()&&ticker.isNotBlank()&&category.isNotBlank()&&broker.isNotBlank())
   database.withTransaction {
-   assetDao.getById(assetId)?:error("Varlık bulunamadı")
+   val existing=assetDao.getById(assetId)?:error("Varlık bulunamadı")
+   val hasTrades=tradeDao.getForAssetOnce(assetId).isNotEmpty()
+   require(!hasTrades||existing.currency.equals(currency,true)){"İşlem geçmişi bulunan varlığın para birimi değiştirilemez."}
+   if(priceSource=="MANUAL") require(manualPrice!=null&&manualPrice>=0.0){"Elle giriş için geçerli güncel fiyat girin."}
    val cleanTicker=ticker.trim().uppercase()
    if(quantity!=null||costPrice!=null){
     require(quantity!=null&&costPrice!=null&&quantity>=0.0&&costPrice>=0.0){"Miktar ve maliyet geçerli olmalı."}
@@ -89,6 +92,7 @@ class PortfolioRepository(private val database:AppDatabase){
     assetDao.updateOpeningPosition(assetId,quantity,costPrice)
    }
    assetDao.updateAssetDetails(assetId,name.trim(),cleanTicker,category,broker,defaultMarketSymbol(cleanTicker,category),currency,priceSource)
+   if(priceSource=="MANUAL"&&manualPrice!=null) assetDao.updatePrice(assetId,manualPrice,System.currentTimeMillis())
   }
  }
  suspend fun editTrade(tradeId:Long,action:String,quantity:Double,unitPrice:Double,fee:Double,note:String,executedAt:Long){
