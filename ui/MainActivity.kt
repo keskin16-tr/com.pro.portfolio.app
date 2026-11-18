@@ -687,7 +687,7 @@ class MainActivity : AppCompatActivity() {
         currentTrades.forEach { trade ->
             val symbol = assets[trade.assetId]?.ticker ?: "Varlık #${trade.assetId}"
             val card = com.google.android.material.card.MaterialCardView(this).apply {
-                radius = dp(16).toFloat(); cardBackgroundColor = ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface)
+                radius = dp(16).toFloat(); setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
                 setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, if (trade.action == "SELL") R.color.portfolio_orange else R.color.portfolio_green)))
                 strokeWidth = dp(1); layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
             }
@@ -766,7 +766,7 @@ class MainActivity : AppCompatActivity() {
             setSelection(if (trade.action == "SELL") 1 else 0)
         }
         fun field(hint: String, value: String) = android.widget.EditText(this).apply {
-            this.hint = hint; setText(value); singleLine = true
+            this.hint = hint; setText(value); isSingleLine = true
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
         }
         var executedAt = trade.executedAt
@@ -788,7 +788,7 @@ class MainActivity : AppCompatActivity() {
         val quantity = field("Miktar", trade.quantity.toString())
         val price = field("Birim fiyat", trade.unitPrice.toString())
         val fee = field("Komisyon", trade.fee.toString())
-        val note = android.widget.EditText(this).apply { hint = "Not"; setText(trade.note); singleLine = true; inputType = android.text.InputType.TYPE_CLASS_TEXT }
+        val note = android.widget.EditText(this).apply { hint = "Not"; setText(trade.note); isSingleLine = true; inputType = android.text.InputType.TYPE_CLASS_TEXT }
         box.addView(TextView(this).apply { text = "İşlem türü"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)) })
         box.addView(action); box.addView(TextView(this).apply { text = "İşlem tarihi ve saati"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, dp(2)) }); box.addView(dateButton); box.addView(quantity); box.addView(price); box.addView(fee); box.addView(note)
         androidx.appcompat.app.AlertDialog.Builder(this).setTitle("İşlemi düzenle").setView(box)
