@@ -26,8 +26,15 @@ class MarketDataRepository{
  private suspend fun fetchFx(asset:AssetEntity):PriceQuote?{
   val pair=asset.marketSymbol.ifBlank{asset.ticker}.uppercase().replace("/","_").replace("-","_")
   val parts=pair.split("_");val base=parts.getOrNull(0)?:return null;val quote=parts.getOrNull(1)?:"TRY"
-  val price=FrankfurterApiService.instance.getExchangeRates(base,quote).rates[quote]?:return null
-  return PriceQuote(pair,price,quote,"Frankfurter")
+  return runCatching{
+   val price=FrankfurterApiService.instance.getExchangeRates(base,quote).rates[quote]?:error("Kur bulunamadı")
+   PriceQuote(pair,price,quote,"Frankfurter")
+  }.getOrElse{
+   val yahooSymbol=when(pair){"USD_TRY","USDTRY"->"USDTRY=X";"EUR_TRY","EURTRY"->"EURTRY=X";"GBP_TRY","GBPTRY"->"GBPTRY=X";else->pair.replace("_","")+"=X"}
+   val meta=YahooFinanceApiService.instance.getStockPrice(yahooSymbol).chart?.result?.firstOrNull()?.meta?:return null
+   val price=meta.regularMarketPrice?:return null
+   PriceQuote(pair,price,quote,"Yahoo Finance")
+  }
  }
  private fun cryptoId(ticker:String):String?=when(ticker.uppercase()){
   "BTC","BTCUSDT"->"bitcoin";"ETH","ETHUSDT"->"ethereum";"BNB"->"binancecoin";"SOL"->"solana";"XRP"->"ripple";"ADA"->"cardano";"DOGE"->"dogecoin";"AVAX"->"avalanche-2";"DOT"->"polkadot";"LINK"->"chainlink";"TRX"->"tron";else->null
