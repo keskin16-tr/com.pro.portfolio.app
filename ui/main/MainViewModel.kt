@@ -40,10 +40,9 @@ class MainViewModel(application:Application):AndroidViewModel(application){
    while(isActive){
     val latestAssets=runCatching { database.assetDao().getAssetsOnce() }.getOrDefault(emptyList())
     latestAssets.forEach{asset->
-     runCatching { marketData.fetchQuote(asset) }.getOrNull()?.let{quote->
-      runCatching { repository.updatePrice(asset.id,quote.price,quote.updatedAt) }
-     }
-     runCatching { repository.recordCurrentPriceSnapshot(asset.id) }
+     val quote=runCatching { marketData.fetchQuote(asset) }.getOrNull()
+     if(quote!=null) runCatching { repository.updatePrice(asset.id,quote.price,quote.updatedAt) }
+     else if(asset.priceSource=="MANUAL") runCatching { repository.recordCurrentPriceSnapshot(asset.id) }
     }
     runCatching { repository.recordDailySnapshot() }
     _dailyPnlTry.value=runCatching{repository.dailyProfitLoss("TRY")}.getOrNull()
