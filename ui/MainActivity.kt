@@ -255,6 +255,12 @@ class MainActivity : AppCompatActivity() {
             pageClockViews += pageClock
             content.addView(pageClock)
             content.addView(body)
+            if (id == NAV_ASSETS) content.addView(actionButton("Yeni varlık / alış ekle", R.color.portfolio_green) { showAddAssetDialog() })
+            if (id == NAV_TRADES) {
+                content.addView(actionButton("Alış / varlık ekle", R.color.portfolio_green) { showAddAssetDialog() })
+                content.addView(actionButton("Satış yap", R.color.portfolio_orange) { showSellDialog() })
+                content.addView(actionButton("Temettü ekle", R.color.portfolio_purple) { showDividendDialog() })
+            }
             if (id == NAV_ASSETS || id == NAV_TRADES || id == NAV_BIST || id == NAV_CRYPTO) {
                 val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 content.addView(list)
@@ -381,7 +387,7 @@ class MainActivity : AppCompatActivity() {
             "${dividend.ticker} • $date\nBrüt: ${currency(dividend.grossAmount, dividend.currency)} • Stopaj: ${currency(dividend.withholdingTax, dividend.currency)}\nNet temettü: ${currency(dividend.netAmount, dividend.currency)}"
         }
         pageTexts[NAV_CATEGORIES]?.text = currentAssets.groupBy { it.category }.entries
-            .sortedByDescending { entry -> entry.value.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
+            .sortedByDescending { entry -> entry.value.size }
             .joinToString("\n\n") { (category, assets) ->
                 val totals = assets.groupBy { it.currency }.entries.joinToString(" • ") { (ccy, rows) -> currency(rows.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) }, ccy) }
                 "${categoryLabel(category)} • ${assets.size} varlık\nToplam değer: $totals"
