@@ -32,7 +32,9 @@ class MarketDataRepository {
         }
         val meta=YahooFinanceApiService.instance.getStockPrice(symbol).chart?.result?.firstOrNull()?.meta?:return null
         val price=meta.regularMarketPrice?:return null
-        return PriceQuote(symbol,price,meta.currency?:asset.currency,"Yahoo Finance")
+        val quoteCurrency=meta.currency?:asset.currency
+        if(!quoteCurrency.equals(asset.currency,true)) return null
+        return PriceQuote(symbol,price,quoteCurrency,"Yahoo Finance")
     }
 
     private suspend fun fetchCrypto(asset:AssetEntity):PriceQuote? {
@@ -45,6 +47,7 @@ class MarketDataRepository {
     private suspend fun fetchFx(asset:AssetEntity):PriceQuote? {
         val pair=asset.marketSymbol.ifBlank{asset.ticker}.uppercase().replace("/","_").replace("-","_")
         val parts=pair.split("_");val base=parts.getOrNull(0)?:return null;val quote=parts.getOrNull(1)?:asset.currency
+        if(!quote.equals(asset.currency,true)) return null
         val price=FrankfurterApiService.instance.getExchangeRates(base,quote).rates[quote]?:return null
         return PriceQuote(pair,price,quote,"Frankfurter")
     }
