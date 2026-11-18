@@ -168,7 +168,7 @@ class MainActivity : AppCompatActivity() {
         root.addView(bottomNavigation, CoordinatorLayout.LayoutParams(
             CoordinatorLayout.LayoutParams.MATCH_PARENT, dp(76)
         ).apply { gravity = Gravity.BOTTOM })
-        bottomNavigation.selectedItemId = NAV_HOME
+        (binding.fabAddAsset.layoutParams as? CoordinatorLayout.LayoutParams)?.let { params ->\n            params.bottomMargin = dp(90)\n            binding.fabAddAsset.layoutParams = params\n        }\n        bottomNavigation.selectedItemId = NAV_HOME
         updatePageContent()
     }
 
