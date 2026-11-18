@@ -8,10 +8,10 @@ class MarketRatesRepository {
     suspend fun fetchRates():List<MarketRate> = withContext(Dispatchers.IO) {
         val service=YahooFinanceApiService.instance
         suspend fun meta(symbol:String)=service.getStockPrice(symbol).chart?.result?.firstOrNull()?.meta
-        val usd=meta("USDTRY=X")
-        val eur=meta("EURTRY=X")
-        val gold=meta("GC=F")
-        val silver=meta("SI=F")
+        val usd=runCatching{meta("USDTRY=X")}.getOrNull()
+        val eur=runCatching{meta("EURTRY=X")}.getOrNull()
+        val gold=runCatching{meta("GC=F")}.getOrNull()
+        val silver=runCatching{meta("SI=F")}.getOrNull()
         val usdNow=usd?.regularMarketPrice
         val eurNow=eur?.regularMarketPrice
         val usdPrev=usd?.previousClose
