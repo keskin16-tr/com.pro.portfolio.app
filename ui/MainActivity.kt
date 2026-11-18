@@ -382,12 +382,14 @@ class MainActivity : AppCompatActivity() {
         pageTexts[NAV_CATEGORIES]?.text = currentAssets.groupBy { it.category }.entries
             .sortedByDescending { entry -> entry.value.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
             .joinToString("\n\n") { (category, assets) ->
-                "${categoryLabel(category)} • ${assets.size} varlık\nToplam değer: ${currency(assets.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) })}"
+                val totals = assets.groupBy { it.currency }.entries.joinToString(" • ") { (ccy, rows) -> currency(rows.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) }, ccy) }
+                "${categoryLabel(category)} • ${assets.size} varlık\nToplam değer: $totals"
             }.ifBlank { "Kategori dağılımı için portföye varlık ekleyin." }
         pageTexts[NAV_BROKERS]?.text = currentAssets.groupBy { it.broker.ifBlank { "Belirtilmedi" } }
             .entries.sortedByDescending { entry -> entry.value.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
             .joinToString("\n\n") { (broker, assets) ->
-                "$broker • ${assets.size} varlık\nToplam değer: ${currency(assets.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) })}"
+                val totals = assets.groupBy { it.currency }.entries.joinToString(" • ") { (ccy, rows) -> currency(rows.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) }, ccy) }
+                "$broker • ${assets.size} varlık\nToplam değer: $totals"
             }.ifBlank { "Aracı kurum dağılımı için portföye varlık ekleyin." }
         pageTexts[NAV_IMPORT]?.text =
             "Excel (.xlsx) dosyasının ilk sayfasında Sembol, Varlık, Kategori, Adet ve Ortalama Maliyet sütunları bulunmalı.\n\nBu işlem mevcut portföy varlıklarını içe aktarır; işlem ve temettü geçmişini içe aktarmaz. Portfolio Pro dışa aktarma dosyaları doğrudan kullanılabilir. Aynı sembol varsa tekrar eklenmez. Önizleme onayından sonra yeni kayıtlar eklenir."
@@ -716,8 +718,8 @@ class MainActivity : AppCompatActivity() {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
         }
         val quantity = field("Satılacak miktar")
-        val price = field("Birim satış fiyatı (TL)")
-        val fee = field("Komisyon / masraf (TL)").apply { setText("0") }
+        val price = field("Birim satış fiyatı (${available.first().currency})")
+        val fee = field("Komisyon / masraf (${available.first().currency})").apply { setText("0") }
         box.addView(spinner); box.addView(quantity); box.addView(price); box.addView(fee)
         androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Varlık satışı").setView(box)
             .setNegativeButton("İptal", null)
@@ -837,7 +839,7 @@ class MainActivity : AppCompatActivity() {
         val list = pageLists[NAV_TRADES] ?: return
         list.removeAllViews()
         if (currentTrades.isEmpty()) {
-            list.addView(TextView(this).apply { text = "Henüz işlem yok. Alış veya satış işlemi ekleyebilirsiniz."; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(12), 0, dp(12)) })
+            list.addView(TextView(this).apply { text = "Henüz işlem yok. Alış, satış veya temettü kaydı ekleyebilirsiniz."; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(12), 0, dp(12)) })
             return
         }
         val assets = currentAssets.associateBy { it.id }
@@ -846,7 +848,7 @@ class MainActivity : AppCompatActivity() {
             val symbol = assets[trade.assetId]?.ticker ?: "Varlık #${trade.assetId}"
             val card = com.google.android.material.card.MaterialCardView(this).apply {
                 radius = dp(16).toFloat(); setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
-                setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, if (trade.action == "SELL") R.color.portfolio_orange else R.color.portfolio_green)))
+                setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, if (trade.action == "SELL") R.color.portfolio_orange else if (trade.action == "DIVIDEND") R.color.portfolio_purple else R.color.portfolio_green)))
                 strokeWidth = dp(1); layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
             }
             val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(14), dp(16), dp(14)) }
