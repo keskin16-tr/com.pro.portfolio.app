@@ -13,11 +13,10 @@ interface AssetDao {
  @Delete suspend fun deleteAsset(asset:AssetEntity)
  @Query("UPDATE assets SET quantity=:quantity, costPrice=:costPrice WHERE id=:assetId") suspend fun updatePosition(assetId:Long,quantity:Double,costPrice:Double)
  @Query("UPDATE assets SET lastPrice=:price, priceUpdatedAt=:updatedAt WHERE id=:assetId") suspend fun updatePrice(assetId:Long,price:Double,updatedAt:Long)
- @Query("UPDATE assets SET priceSource=:source WHERE id=:assetId") suspend fun updatePriceSource(assetId:Long,source:String)
  @Query("SELECT * FROM assets WHERE id=:assetId LIMIT 1") suspend fun getById(assetId:Long):AssetEntity?
  @Query("UPDATE assets SET category=:category, broker=:broker WHERE id=:assetId") suspend fun updateClassification(assetId:Long,category:String,broker:String)
- @Query("UPDATE assets SET name=:name, ticker=:ticker, category=:category, broker=:broker, marketSymbol=:marketSymbol WHERE id=:assetId")
- suspend fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String,marketSymbol:String)
+ @Query("UPDATE assets SET name=:name, ticker=:ticker, category=:category, broker=:broker, marketSymbol=:marketSymbol, currency=:currency, priceSource=:priceSource WHERE id=:assetId")
+ suspend fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String,marketSymbol:String,currency:String,priceSource:String)
  @Query("UPDATE assets SET quantity=:quantity, costPrice=:costPrice, openingQuantity=:quantity, openingCostPrice=:costPrice WHERE id=:assetId")
  suspend fun updateOpeningPosition(assetId:Long,quantity:Double,costPrice:Double)
 }
