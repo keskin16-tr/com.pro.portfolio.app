@@ -68,6 +68,7 @@ class MainActivity : AppCompatActivity() {
     private var tradeSearchQuery = ""
     private var tradeActionFilter = "Tümü"
     private var tradeCurrencyFilter = "Tümü"
+    private var tradeDateFilter = "Tümü"
     private var selectedSummaryCurrency = "TRY"
     private var dailyPnlTry: Double? = null
     private var dailyPnlUsd: Double? = null
@@ -299,6 +300,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 addFilter(listOf("Tümü", "Alış", "Satış", "Temettü")) { tradeActionFilter = it }
                 addFilter(listOf("Tümü", "TRY", "USD")) { tradeCurrencyFilter = it }
+                addFilter(listOf("Tümü", "7 gün", "30 gün", "90 gün", "Bu yıl")) { tradeDateFilter = it }
                 content.addView(filters)
             }
             if (id == NAV_ASSETS || id == NAV_TRADES || id == NAV_BIST || id == NAV_CRYPTO) {
@@ -962,8 +964,11 @@ class MainActivity : AppCompatActivity() {
             val matchesAction = tradeActionFilter == "Tümü" || actionLabel == tradeActionFilter
             val matchesCurrency = tradeCurrencyFilter == "Tümü" || trade.currency.equals(tradeCurrencyFilter, true)
             val query = tradeSearchQuery.trim()
-            val matchesQuery = query.isBlank() || symbol.contains(query, true) || asset?.name.orEmpty().contains(query, true) || trade.note.contains(query, true)
-            matchesAction && matchesCurrency && matchesQuery
+            val matchesQuery = query.isBlank() || symbol.contains(query, true) || asset?.name.orEmpty().contains(query, true) || asset?.broker.orEmpty().contains(query, true) || trade.note.contains(query, true)
+            val now = System.currentTimeMillis()
+            val dateCutoff = when (tradeDateFilter) { "7 gün" -> now - 7L * 86_400_000L; "30 gün" -> now - 30L * 86_400_000L; "90 gün" -> now - 90L * 86_400_000L; "Bu yıl" -> java.util.Calendar.getInstance().apply { set(java.util.Calendar.DAY_OF_YEAR, 1); set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0) }.timeInMillis; else -> Long.MIN_VALUE }
+            val matchesDate = trade.executedAt >= dateCutoff
+            matchesAction && matchesCurrency && matchesQuery && matchesDate
         }
         if (filteredTrades.isEmpty()) list.addView(TextView(this).apply { text = "Seçili filtrelerle eşleşen işlem bulunamadı."; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(12), 0, dp(12)) })
         filteredTrades.forEach { trade ->
