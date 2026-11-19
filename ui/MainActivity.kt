@@ -504,7 +504,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateDashboardAllocationChart() {
         val rate = currentRates.firstOrNull { it.title.equals("Dolar / TL", true) }?.value
-        val values = currentAssets.filter { it.quantity > 0.0 }.mapNotNull { asset ->
+        val active = currentAssets.filter { it.quantity > 0.0 }
+        val converted = active.map { asset ->
             val native = asset.quantity * (asset.lastPrice ?: asset.costPrice)
             when {
                 asset.currency.equals(selectedSummaryCurrency, true) -> native
@@ -514,6 +515,8 @@ class MainActivity : AppCompatActivity() {
                 else -> null
             }
         }
+        val complete = converted.none { it == null }
+        val values = if (complete) converted.filterNotNull() else emptyList()
         binding.portfolioChart.setValues(values.map { it.toFloat() })
         binding.tvChartEmpty.visibility = if (values.isEmpty()) View.VISIBLE else View.GONE
     }
