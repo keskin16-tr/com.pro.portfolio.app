@@ -8,6 +8,9 @@ import com.portfolio.app.data.local.DividendEntity
 import com.portfolio.app.data.local.PortfolioSnapshotEntity
 import com.portfolio.app.data.local.AssetPriceSnapshotEntity
 import com.portfolio.app.data.importer.ImportedHolding
+import com.portfolio.app.data.importer.ImportedPortfolio
+import com.portfolio.app.data.importer.ImportedAsset
+import com.portfolio.app.data.importer.ImportedTrade
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 
@@ -114,6 +117,118 @@ class PortfolioRepository(private val database: AppDatabase) {
             }
         }
         return added to skipped
+    }
+
+
+    data class RestoreResult(val assetsAdded: Int, val assetsSkipped: Int, val tradesAdded: Int, val tradesSkipped: Int)
+
+    suspend fun restorePortfolio(backup: ImportedPortfolio, overwrite: Boolean): RestoreResult {
+        require(backup.assets.isNotEmpty()) { "Yedekte varlık bulunamadı." }
+        require(backup.assets.all { it.currency in listOf("TRY", "USD") }) {
+            "Bu sürümde yalnızca TRY ve USD varlıklar destekleniyor."
+        }
+        require(backup.trades.all { it.currency in listOf("TRY", "USD") }) {
+            "İşlem geçmişinde TRY veya USD dışında para birimi bulundu."
+        }
+        var addedAssets = 0
+        var skippedAssets = 0
+        var addedTrades = 0
+        var skippedTrades = 0
+        database.withTransaction {
+            if (overwrite) {
+                tradeDao.deleteAll()
+                dividendDao.deleteAll()
+                priceSnapshotDao.deleteAll()
+                snapshotDao.deleteAll()
+                assetDao.deleteAll()
+            }
+            val existingAssets = assetDao.getAssetsOnce()
+            val existingByKey = existingAssets.associateBy { it.ticker.uppercase() + "|" + it.currency.uppercase() }
+            val sourceToLocal = mutableMapOf<Long, Long>()
+            val acceptedKeys = mutableSetOf<String>()
+            val acceptedAssets = mutableMapOf<String, Pair<Long, ImportedAsset>>()
+
+            backup.assets.forEach { item ->
+                val key = item.ticker.uppercase() + "|" + item.currency.uppercase()
+                val existing = existingByKey[key]
+                if (!overwrite && existing != null) {
+                    skippedAssets++
+                    item.sourceId?.let { sourceToLocal[it] = existing.id }
+                    return@forEach
+                }
+                if (!acceptedKeys.add(key)) {
+                    skippedAssets++
+                    return@forEach
+                }
+                val related = backup.trades.filter { trade ->
+                    (item.sourceId != null && trade.sourceAssetId == item.sourceId) ||
+                        (trade.sourceAssetId == null && trade.ticker.equals(item.ticker, true))
+                }.sortedBy { it.executedAt }
+                val openingQuantity = if (related.isEmpty()) item.quantity else
+                    item.quantity - related.filter { it.action == "BUY" }.sumOf { it.quantity } +
+                        related.filter { it.action == "SELL" }.sumOf { it.quantity }
+                require(openingQuantity >= -1e-8) {
+                    "${item.ticker}: işlem geçmişi mevcut miktarla uyuşmuyor. Yedek dosyayı kontrol edin."
+                }
+                val openingQty = openingQuantity.coerceAtLeast(0.0)
+                val buyCost = related.filter { it.action == "BUY" }.sumOf { it.quantity * it.unitPrice + it.fee }
+                val openingCost = if (openingQty > 1e-8) {
+                    ((item.costPerUnit * item.quantity - buyCost) / openingQty).coerceAtLeast(0.0)
+                } else 0.0
+                val id = assetDao.insertAsset(AssetEntity(
+                    id = if (overwrite) item.sourceId?.takeIf { it > 0L } ?: 0L else 0L,
+                    name = item.name, ticker = item.ticker, quantity = item.quantity,
+                    costPrice = item.costPerUnit, category = item.category, portfolioName = item.portfolioName,
+                    currency = item.currency, marketSymbol = item.marketSymbol, lastPrice = item.unitPrice,
+                    broker = item.broker, openingQuantity = openingQty, openingCostPrice = openingCost,
+                    priceSource = item.priceSource
+                ))
+                item.sourceId?.let { sourceToLocal[it] = id }
+                acceptedAssets[key] = id to item
+                addedAssets++
+            }
+
+            val importedFingerprints = mutableSetOf<String>()
+            val existingTrades = if (overwrite) emptyList() else tradeDao.getAllOnce()
+            fun fingerprint(assetId: Long, action: String, qty: Double, price: Double, fee: Double, date: Long, currency: String, note: String) =
+                listOf(assetId, action, qty, price, fee, date, currency, note.trim()).joinToString("|")
+            val existingFingerprints = existingTrades.map { fingerprint(it.assetId, it.action, it.quantity, it.unitPrice, it.fee, it.executedAt, it.currency, it.note) }.toMutableSet()
+
+            backup.trades.sortedBy { it.executedAt }.forEach { item ->
+                val asset = if (item.sourceAssetId != null) {
+                    val localId = sourceToLocal[item.sourceAssetId]
+                    localId?.let { assetDao.getById(it) }
+                } else {
+                    val match = backup.assets.firstOrNull { it.ticker.equals(item.ticker, true) }
+                    val localId = match?.let { sourceToLocal[it.sourceId] }
+                    localId?.let { assetDao.getById(it) }
+                        ?: assetDao.getAssetsOnce().firstOrNull { it.ticker.equals(item.ticker, true) && it.currency.equals(item.currency, true) }
+                } ?: return@forEach
+                val key = fingerprint(asset.id, item.action, item.quantity, item.unitPrice, item.fee, item.executedAt, item.currency, item.note)
+                if (!overwrite && (key in existingFingerprints || !acceptedAssets.containsKey(asset.ticker.uppercase() + "|" + asset.currency.uppercase()))) {
+                    skippedTrades++
+                    return@forEach
+                }
+                if (!importedFingerprints.add(key)) { skippedTrades++; return@forEach }
+                val tradeId = tradeDao.insert(TradeEntity(
+                    id = if (overwrite) item.sourceId?.takeIf { it > 0L } ?: 0L else 0L,
+                    assetId = asset.id, action = item.action, quantity = item.quantity,
+                    unitPrice = item.unitPrice, fee = item.fee, realizedProfit = item.realizedProfit ?: 0.0,
+                    executedAt = item.executedAt, note = item.note, currency = item.currency
+                ))
+                if (item.action == "DIVIDEND") {
+                    dividendDao.insert(DividendEntity(
+                        assetId = asset.id, ticker = asset.ticker, quantityAtPayment = asset.quantity,
+                        grossAmount = item.unitPrice, withholdingTax = item.fee,
+                        netAmount = item.unitPrice - item.fee, currency = item.currency,
+                        exDate = item.executedAt, paymentDate = item.executedAt, note = item.note, tradeId = tradeId
+                    ))
+                }
+                addedTrades++
+            }
+            acceptedAssets.values.forEach { (assetId, _) -> recalculateAsset(assetId) }
+        }
+        return RestoreResult(addedAssets, skippedAssets, addedTrades, skippedTrades)
     }
 
     suspend fun classifyAsset(assetId: Long, category: String, broker: String) {
