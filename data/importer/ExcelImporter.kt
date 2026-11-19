@@ -73,7 +73,7 @@ object ExcelImporter {
         val marketCol = col("market_symbol", "market symbol")
         return rows.drop(1).mapNotNull { row ->
             fun v(i: Int?) = i?.let { row.getOrNull(it).orEmpty().trim() }.orEmpty()
-            val ticker = v(tickerCol).uppercase(Locale.ROOT)
+            val ticker = v(tickerCol).ifBlank { v(nameCol) }.uppercase(Locale.ROOT)
             val qty = number(v(qtyCol)); val cost = number(v(costCol))
             if (ticker.isBlank() || qty == null || qty < 0.0 || cost == null || cost < 0.0) null
             else {
