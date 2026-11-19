@@ -214,7 +214,7 @@ object ExcelImporter {
             if (serial in 1.0..100000.0) return ((serial - 25569.0) * 86_400_000.0).toLong()
         }
         s.toLongOrNull()?.let { return when { it > 10_000_000_000L -> it; it > 0 -> it * 1000L; else -> null } }
-        val patterns = listOf("yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd", "dd.MM.yyyy HH:mm:ss", "dd.MM.yyyy", "MM/dd/yyyy")
+        val patterns = listOf("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", "yyyy-MM-dd'T'HH:mm:ssXXX", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd", "dd.MM.yyyy HH:mm:ss", "dd.MM.yyyy", "MM/dd/yyyy")
         patterns.forEach { pattern -> runCatching { SimpleDateFormat(pattern, Locale.US).apply { isLenient = false }.parse(s)?.time }.getOrNull()?.let { return it } }
         return null
     }
