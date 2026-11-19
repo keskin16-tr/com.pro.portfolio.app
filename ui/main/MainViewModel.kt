@@ -10,6 +10,7 @@ import com.portfolio.app.data.local.TradeEntity
 import com.portfolio.app.data.local.PortfolioSnapshotEntity
 import com.portfolio.app.data.local.AssetPriceSnapshotEntity
 import com.portfolio.app.data.importer.ImportedHolding
+import com.portfolio.app.data.importer.ImportedPortfolio
 import com.portfolio.app.data.remote.MarketDataRepository
 import com.portfolio.app.data.remote.MarketRatesRepository
 import com.portfolio.app.data.remote.MarketRate
@@ -78,6 +79,7 @@ class MainViewModel(application:Application):AndroidViewModel(application){
  fun refreshRates(){viewModelScope.launch{syncRates()}}
  fun addAsset(name:String,ticker:String,quantity:Double,costPrice:Double,category:String,broker:String,currency:String,priceSource:String,manualPrice:Double?){viewModelScope.launch{runCatching{repository.recordBuy(name,ticker,quantity,costPrice,category=category,currency=currency,broker=broker,priceSource=priceSource,manualPrice=manualPrice)}}}
  fun importHoldings(rows:List<ImportedHolding>,onResult:(Result<Pair<Int,Int>>)->Unit){viewModelScope.launch{onResult(runCatching{repository.importHoldings(rows)})}}
+ fun restorePortfolio(backup:ImportedPortfolio,overwrite:Boolean,onResult:(Result<PortfolioRepository.RestoreResult>)->Unit){viewModelScope.launch{onResult(runCatching{repository.restorePortfolio(backup,overwrite)})}}
  fun classifyAsset(assetId:Long,category:String,broker:String,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.classifyAsset(assetId,category,broker)})}}
  fun addDividend(ticker:String,grossAmount:Double,taxPercent:Double,currency:String){viewModelScope.launch{runCatching{repository.recordDividend(ticker,grossAmount,taxPercent,currency)}}}
  fun sellAsset(assetId:Long,quantity:Double,unitPrice:Double,fee:Double,onResult:(Result<Unit>)->Unit){
