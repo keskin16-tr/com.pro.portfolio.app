@@ -7,6 +7,9 @@ import androidx.room.Query
 
 @Dao
 interface AssetPriceSnapshotDao {
+    @Query("SELECT * FROM asset_price_snapshots ORDER BY snapshotDate ASC")
+    suspend fun getAll(): List<AssetPriceSnapshotEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(snapshot: AssetPriceSnapshotEntity)
 

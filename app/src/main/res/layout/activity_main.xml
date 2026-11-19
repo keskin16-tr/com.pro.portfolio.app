@@ -50,15 +50,21 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <TextView
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
-                    android:background="@drawable/bg_avatar"
-                    android:gravity="center"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCurrencyToggle"
+                    android:layout_width="52dp"
+                    android:layout_height="48dp"
+                    android:minWidth="52dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:text="₺"
                     android:textColor="@color/portfolio_green"
-                    android:textSize="21sp"
-                    android:textStyle="bold" />
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_surface"
+                    app:cornerRadius="16dp"
+                    app:strokeColor="@color/portfolio_green"
+                    app:strokeWidth="1dp" />
             </LinearLayout>
 
             <TextView
@@ -187,7 +193,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/invested_total"
+                        android:text="@string/portfolio_total_value"
                         android:textColor="@color/portfolio_muted"
                         android:textSize="13sp" />
 
@@ -215,6 +221,15 @@
                         android:text="₺0,00"
                         android:textColor="@color/portfolio_green"
                         android:textSize="22sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:id="@+id/tvTotalProfitLossPercent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="%0,00 toplam getiri"
+                        android:textColor="@color/portfolio_green"
+                        android:textSize="14sp"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
@@ -258,7 +273,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:gravity="end"
-                            android:text="Alış maliyeti bazında"
+                            android:text="Güncel piyasa değeri"
                             android:textColor="@color/portfolio_muted"
                             android:textSize="11sp" />
                     </LinearLayout>
@@ -291,7 +306,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Maliyet"
+                    android:text="Piyasa değeri"
                     android:textColor="@color/portfolio_muted"
                     android:textSize="12sp" />
             </LinearLayout>

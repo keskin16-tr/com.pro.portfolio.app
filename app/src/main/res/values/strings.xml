@@ -2,7 +2,8 @@
 <resources>
     <string name="app_name">Portfolio Pro</string>
     <string name="dashboard_title">Portföyüm</string>
-    <string name="invested_total">Toplam yatırım maliyeti</string>
+    <string name="invested_total">Toplam portföy değeri</string>
+    <string name="portfolio_total_value">Toplam portföy değeri</string>
     <string name="asset_count">%1$d varlık</string>
     <string name="holdings_title">Varlıklarım</string>
     <string name="add_asset">Varlık ekle</string>
