@@ -167,8 +167,6 @@ class MainActivity : AppCompatActivity() {
                 viewModel.rates.collect { currentRates = it; updateSummary(); renderMarketRates(); renderTopRates() }
             }
         }
-    }
-
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.ratesSyncing.collect { syncing ->
@@ -177,6 +175,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
     override fun onStart() {
         super.onStart()
         clockHandler.removeCallbacks(clockUpdate)
