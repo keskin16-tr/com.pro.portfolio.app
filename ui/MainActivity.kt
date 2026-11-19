@@ -830,7 +830,10 @@ class MainActivity : AppCompatActivity() {
         val chart = com.portfolio.app.ui.chart.PortfolioChartView(this).apply {
             this.type = type; this.values = values; this.labels = labels
             centerValue = center; this.suffix = suffix
-            layoutParams = LinearLayout.LayoutParams(-1, dp(height))
+            val chartHeight = if (type == com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT) {
+                maxOf(height, labels.size.coerceAtMost(8) * 30 + 28)
+            } else height
+            layoutParams = LinearLayout.LayoutParams(-1, dp(chartHeight))
         }
         container.addView(chart)
     }
