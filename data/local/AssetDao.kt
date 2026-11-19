@@ -19,4 +19,5 @@ interface AssetDao {
  suspend fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String,marketSymbol:String,currency:String,priceSource:String)
  @Query("UPDATE assets SET quantity=:quantity, costPrice=:costPrice, openingQuantity=:quantity, openingCostPrice=:costPrice WHERE id=:assetId")
  suspend fun updateOpeningPosition(assetId:Long,quantity:Double,costPrice:Double)
+    @Query("DELETE FROM assets") suspend fun deleteAll()
 }
