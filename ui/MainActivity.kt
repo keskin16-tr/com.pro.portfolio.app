@@ -526,6 +526,17 @@ class MainActivity : AppCompatActivity() {
         container.removeAllViews()
         if (currentAssets.isEmpty()) return
         val rate = currentRates.firstOrNull { it.title.equals("Dolar / TL", true) }?.value
+        val needsFx = currentAssets.any { !it.currency.equals(selectedSummaryCurrency, true) } ||
+            currentTrades.any { !it.currency.equals(selectedSummaryCurrency, true) } ||
+            currentDividends.any { !it.currency.equals(selectedSummaryCurrency, true) }
+        if (needsFx && (rate == null || rate <= 0.0)) {
+            container.addView(TextView(this).apply {
+                text = "USD/TRY kuru bekleniyor. Farklı para birimlerindeki veriler eksik toplam göstermemek için grafiklere dahil edilmedi."
+                textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                setPadding(0, dp(12), 0, dp(12))
+            })
+            return
+        }
         fun convert(value: Double, code: String): Double? {
             if (code.equals(selectedSummaryCurrency, true)) return value
             if (rate == null || rate <= 0.0) return null
