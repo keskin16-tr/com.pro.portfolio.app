@@ -7,6 +7,7 @@ import com.portfolio.app.data.local.AssetEntity
 import com.portfolio.app.data.local.DividendEntity
 import com.portfolio.app.data.local.TradeEntity
 import com.portfolio.app.data.local.PortfolioSnapshotEntity
+import com.portfolio.app.data.local.AssetPriceSnapshotEntity
 import com.portfolio.app.data.importer.ImportedHolding
 import com.portfolio.app.data.remote.MarketDataRepository
 import com.portfolio.app.data.remote.MarketRatesRepository
@@ -25,6 +26,8 @@ class MainViewModel(application:Application):AndroidViewModel(application){
  private val marketRates=MarketRatesRepository()
  private val _rates= kotlinx.coroutines.flow.MutableStateFlow<List<MarketRate>>(emptyList())
  val rates:StateFlow<List<MarketRate>> = _rates
+ private val _priceSnapshots=kotlinx.coroutines.flow.MutableStateFlow<List<AssetPriceSnapshotEntity>>(emptyList())
+ val priceSnapshots:StateFlow<List<AssetPriceSnapshotEntity>> = _priceSnapshots
  private val _dailyPnlTry=kotlinx.coroutines.flow.MutableStateFlow<Double?>(null)
  val dailyPnlTry:StateFlow<Double?> = _dailyPnlTry
  private val _dailyPnlUsd=kotlinx.coroutines.flow.MutableStateFlow<Double?>(null)
@@ -45,6 +48,7 @@ class MainViewModel(application:Application):AndroidViewModel(application){
      else if(asset.priceSource=="MANUAL") runCatching { repository.recordCurrentPriceSnapshot(asset.id) }
     }
     runCatching { repository.recordDailySnapshot() }
+    runCatching { _priceSnapshots.value = database.assetPriceSnapshotDao().getAll() }
     _dailyPnlTry.value=runCatching{repository.dailyProfitLoss("TRY")}.getOrNull()
     _dailyPnlUsd.value=runCatching{repository.dailyProfitLoss("USD")}.getOrNull()
     runCatching{_rates.value=marketRates.fetchRates()}
