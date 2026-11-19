@@ -408,44 +408,55 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateSummary() {
-        val currencies = listOf("TRY", "USD")
-        fun rowsFor(calc: (String) -> Double): String = currencies.mapNotNull { code ->
-            val amount = calc(code)
-            if (amount == 0.0 && currentAssets.none { it.currency == code } && currentTrades.none { it.currency == code } && currentDividends.none { it.currency == code }) null
-            else currency(amount, code)
-        }.joinToString("\n").ifBlank { "—" }
-        val invested = rowsFor { code -> currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.quantity * it.costPrice } }
-        val totalPnl = rowsFor { code ->
+        val displayCurrency = selectedSummaryCurrency
+        val usdTry = currentRates.firstOrNull { it.title.equals("Dolar / TL", true) }?.value
+        val hasTry = currentAssets.any { it.currency.equals("TRY", true) } || currentTrades.any { it.currency.equals("TRY", true) } || currentDividends.any { it.currency.equals("TRY", true) }
+        val hasUsd = currentAssets.any { it.currency.equals("USD", true) } || currentTrades.any { it.currency.equals("USD", true) } || currentDividends.any { it.currency.equals("USD", true) }
+        fun convert(amount: Double, source: String): Double? {
+            if (source.equals(displayCurrency, true)) return amount
+            val rate = usdTry?.takeIf { it > 0.0 } ?: return null
+            return if (source == "TRY" && displayCurrency == "USD") amount / rate else if (source == "USD" && displayCurrency == "TRY") amount * rate else null
+        }
+        fun total(calc: (String) -> Double): Double? {
+            val t = if (hasTry) convert(calc("TRY"), "TRY") else 0.0
+            val u = if (hasUsd) convert(calc("USD"), "USD") else 0.0
+            if ((hasTry && t == null) || (hasUsd && u == null)) return null
+            return (t ?: 0.0) + (u ?: 0.0)
+        }
+        val marketValue = total { code -> currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
+        val pnl = total { code ->
             val unrealized = currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.quantity * ((it.lastPrice ?: it.costPrice) - it.costPrice) }
             val realized = currentTrades.filter { it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
-            val netDividends = currentDividends.filter { it.currency.equals(code, true) }.sumOf { it.netAmount }
-            unrealized + realized + netDividends
+            val dividends = currentDividends.filter { it.currency.equals(code, true) }.sumOf { it.netAmount }
+            unrealized + realized + dividends
         }
-        binding.tvTotalValue.text = invested
-        binding.tvTotalProfitLoss.text = totalPnl
-        val todayStart = java.util.Calendar.getInstance().apply {
-            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
-            set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
-        }.timeInMillis
-        val dividendTodayTry = currentDividends.filter { it.currency == "TRY" && it.paymentDate >= todayStart }.sumOf { it.netAmount }
-        val dividendTodayUsd = currentDividends.filter { it.currency == "USD" && it.paymentDate >= todayStart }.sumOf { it.netAmount }
-        val dailyTry = dailyPnlTry?.plus(dividendTodayTry) ?: dividendTodayTry.takeIf { it != 0.0 }
-        val dailyUsd = dailyPnlUsd?.plus(dividendTodayUsd) ?: dividendTodayUsd.takeIf { it != 0.0 }
-        binding.tvDailyProfitLoss.text = buildString {
-            append("TRY  •  "); append(dailyTry?.let { currency(it, "TRY") } ?: "Önceki gün verisi birikiyor")
-            append("\nUSD  •  "); append(dailyUsd?.let { currency(it, "USD") } ?: "Önceki gün verisi birikiyor")
+        val capital = total { code ->
+            val opening = currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.openingQuantity * it.openingCostPrice }
+            val buys = currentTrades.filter { it.action == "BUY" && it.currency.equals(code, true) }.sumOf { it.quantity * it.unitPrice + it.fee }
+            opening + buys
         }
-        val totalIsNegative = listOf("TRY", "USD").any { code ->
-            val unrealized = currentAssets.filter { it.currency == code }.sumOf { it.quantity * ((it.lastPrice ?: it.costPrice) - it.costPrice) }
-            val realized = currentTrades.filter { it.action == "SELL" && it.currency == code }.sumOf { it.realizedProfit }
-            val dividends = currentDividends.filter { it.currency == code }.sumOf { it.netAmount }
-            unrealized + realized + dividends < 0.0
+        val percent = if (pnl != null && capital != null && capital > 0.0) pnl / capital * 100.0 else null
+        binding.btnCurrencyToggle.text = if (displayCurrency == "TRY") "₺" else "$"
+        binding.btnCurrencyToggle.contentDescription = if (displayCurrency == "TRY") "Dolar görünümüne geç" else "Türk lirası görünümüne geç"
+        binding.tvTotalValue.text = marketValue?.let { currency(it, displayCurrency) } ?: "USD/TRY kuru bekleniyor"
+        binding.tvTotalProfitLoss.text = pnl?.let { currency(it, displayCurrency) } ?: "USD/TRY kuru bekleniyor"
+        binding.tvTotalProfitLossPercent.text = percent?.let { String.format(Locale("tr", "TR"), "%+.2f%% toplam getiri", it) } ?: "Getiri yüzdesi hesaplanamıyor"
+        binding.tvTotalProfitLoss.setTextColor(ContextCompat.getColor(this, if ((pnl ?: 0.0) < 0.0) R.color.portfolio_orange else R.color.portfolio_green))
+        binding.tvTotalProfitLossPercent.setTextColor(ContextCompat.getColor(this, if ((percent ?: 0.0) < 0.0) R.color.portfolio_orange else R.color.portfolio_green))
+        val todayStart = java.util.Calendar.getInstance().apply { set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0) }.timeInMillis
+        val divTry = currentDividends.filter { it.currency == "TRY" && it.paymentDate >= todayStart }.sumOf { it.netAmount }
+        val divUsd = currentDividends.filter { it.currency == "USD" && it.paymentDate >= todayStart }.sumOf { it.netAmount }
+        val dailyTry = dailyPnlTry?.plus(divTry) ?: divTry.takeIf { it != 0.0 }
+        val dailyUsd = dailyPnlUsd?.plus(divUsd) ?: divUsd.takeIf { it != 0.0 }
+        val daily = if (dailyTry == null && dailyUsd == null) null else {
+            val t = if (hasTry) convert(dailyTry ?: 0.0, "TRY") else 0.0
+            val u = if (hasUsd) convert(dailyUsd ?: 0.0, "USD") else 0.0
+            if ((hasTry && t == null) || (hasUsd && u == null)) null else (t ?: 0.0) + (u ?: 0.0)
         }
-        binding.tvTotalProfitLoss.setTextColor(ContextCompat.getColor(this, if (totalIsNegative) R.color.portfolio_orange else R.color.portfolio_green))
-        binding.tvDailyProfitLoss.setTextColor(ContextCompat.getColor(this, if ((dailyTry ?: 0.0) < 0.0 || (dailyUsd ?: 0.0) < 0.0) R.color.portfolio_orange else R.color.portfolio_text))
-        binding.tvHeaderTitle.contentDescription = "Toplam yatırım $invested. Toplam kâr zarar $totalPnl"
+        binding.tvDailyProfitLoss.text = daily?.let { currency(it, displayCurrency) } ?: "Günlük karşılaştırma verisi birikiyor"
+        binding.tvDailyProfitLoss.setTextColor(ContextCompat.getColor(this, if ((daily ?: 0.0) < 0.0) R.color.portfolio_orange else R.color.portfolio_text))
+        binding.tvHeaderTitle.contentDescription = "Toplam portföy piyasa değeri: " + binding.tvTotalValue.text + ". Kâr zarar: " + binding.tvTotalProfitLoss.text + ". Getiri: " + binding.tvTotalProfitLossPercent.text
     }
-
     private fun renderMarketAssets(pageId: Int) {
         val list = pageLists[pageId] ?: return
         list.removeAllViews()
