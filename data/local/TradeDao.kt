@@ -15,4 +15,5 @@ interface TradeDao {
  @Delete suspend fun delete(trade:TradeEntity)
  @Query("SELECT * FROM transactions ORDER BY executedAt DESC,id DESC") fun getAll():Flow<List<TradeEntity>>
  @Query("SELECT COUNT(*) FROM transactions") fun count():Flow<Int>
+    @Query("DELETE FROM transactions") suspend fun deleteAll()
 }
