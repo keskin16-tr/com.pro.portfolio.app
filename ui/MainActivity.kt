@@ -959,7 +959,6 @@ class MainActivity : AppCompatActivity() {
         }
         if (filteredTrades.isEmpty()) list.addView(TextView(this).apply { text = "Seçili filtrelerle eşleşen işlem bulunamadı."; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(12), 0, dp(12)) })
         filteredTrades.forEach { trade ->
-        filteredTrades.forEach { trade ->
             val symbol = assets[trade.assetId]?.ticker ?: "Varlık #${trade.assetId}"
             val card = com.google.android.material.card.MaterialCardView(this).apply {
                 radius = dp(16).toFloat(); setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
