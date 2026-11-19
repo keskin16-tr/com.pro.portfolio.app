@@ -25,13 +25,21 @@ object ExcelImporter {
         ZipInputStream(input).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
-                if (!entry.isDirectory && (entry.name == "xl/worksheets/sheet1.xml" ||
-                    entry.name == "xl/sharedStrings.xml")) entries[entry.name] = zip.readBytes()
+                if (!entry.isDirectory && (
+                    entry.name == "xl/workbook.xml" ||
+                    entry.name == "xl/_rels/workbook.xml.rels" ||
+                    entry.name == "xl/sharedStrings.xml" ||
+                    entry.name.startsWith("xl/worksheets/") && entry.name.endsWith(".xml")
+                )) entries[entry.name] = zip.readBytes()
                 zip.closeEntry()
             }
         }
-        val sheet = entries["xl/worksheets/sheet1.xml"]
-            ?: error("Excel dosyasında ilk çalışma sayfası bulunamadı.")
+        val sheetFiles = entries.filterKeys { it.startsWith("xl/worksheets/") && it.endsWith(".xml") }
+        if (sheetFiles.isEmpty()) error("Excel dosyasında çalışma sayfası bulunamadı.")
+        val sheetMap = resolveSheets(entries["xl/workbook.xml"], entries["xl/_rels/workbook.xml.rels"])
+        val preferred = sheetMap.firstOrNull { normalize(it.first) in setOf("VARLIKLAR", "PORTFOY", "HOLDINGS") }
+        val sheetPath = preferred?.second ?: sheetFiles.keys.sorted().first()
+        val sheet = entries[sheetPath] ?: error("Varlıklar çalışma sayfası okunamadı.")
         val shared = entries["xl/sharedStrings.xml"]?.let(::parseSharedStrings).orEmpty()
         val rows = parseRows(sheet, shared)
         if (rows.isEmpty()) error("Excel sayfasında veri bulunamadı.")
@@ -65,6 +73,46 @@ object ExcelImporter {
                 normalizePriceSource(value(sourceCol))
             )
         }.distinctBy { it.ticker }
+    }
+
+    private fun resolveSheets(workbook: ByteArray?, relationships: ByteArray?): List<Pair<String, String>> {
+        if (workbook == null || relationships == null) return emptyList()
+        val targets = mutableMapOf<String, String>()
+        val relParser = Xml.newPullParser()
+        relParser.setInput(relationships.inputStream(), "UTF-8")
+        var event = relParser.eventType
+        while (event != XmlPullParser.END_DOCUMENT) {
+            if (event == XmlPullParser.START_TAG && relParser.name == "Relationship") {
+                val id = relParser.getAttributeValue(null, "Id").orEmpty()
+                val target = relParser.getAttributeValue(null, "Target").orEmpty()
+                if (id.isNotBlank() && target.isNotBlank()) {
+                    targets[id] = if (target.startsWith("/")) target.removePrefix("/")
+                    else "xl/" + target.removePrefix("xl/")
+                }
+            }
+            event = relParser.next()
+        }
+        val result = mutableListOf<Pair<String, String>>()
+        val parser = Xml.newPullParser()
+        parser.setInput(workbook.inputStream(), "UTF-8")
+        event = parser.eventType
+        while (event != XmlPullParser.END_DOCUMENT) {
+            if (event == XmlPullParser.START_TAG && parser.name == "sheet") {
+                val name = parser.getAttributeValue(null, "name").orEmpty()
+                var relationId = parser.getAttributeValue("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id").orEmpty()
+                if (relationId.isBlank()) {
+                    for (i in 0 until parser.attributeCount) {
+                        if (parser.getAttributeName(i) == "id") relationId = parser.getAttributeValue(i)
+                    }
+                }
+                targets[relationId]?.let { path ->
+                    val normalizedPath = if (path.startsWith("xl/")) path else "xl/$path"
+                    result += name to normalizedPath
+                }
+            }
+            event = parser.next()
+        }
+        return result
     }
 
     private fun parseRows(xml: ByteArray, shared: List<String>): List<List<String>> {
