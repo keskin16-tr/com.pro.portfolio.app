@@ -55,6 +55,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bottomNavigation: BottomNavigationView
     private var analyticsContainer: LinearLayout? = null
     private var ratesContainer: LinearLayout? = null
+    private var dashboardChartsContainer: LinearLayout? = null
+    private val breakdownContainers = mutableMapOf<Int, LinearLayout>()
     private val pageViews = mutableMapOf<Int, View>()
     private val pageTexts = mutableMapOf<Int, TextView>()
     private val pageLists = mutableMapOf<Int, LinearLayout>()
@@ -99,6 +101,7 @@ class MainActivity : AppCompatActivity() {
         dashboardView = binding.root.getChildAt(0)
         setupRecyclerView()
         setupNavigation()
+        setupDashboardCharts()
 
         binding.fabAddAsset.visibility = View.GONE
         binding.btnSellAsset.visibility = View.GONE
@@ -120,9 +123,7 @@ class MainActivity : AppCompatActivity() {
                     binding.tvAssetCount.text = getString(R.string.asset_count, assets.size)
                     binding.tvHoldingsCount.text = "${assets.size} kayıt"
                     binding.tvEmptyState.visibility = if (assets.isEmpty()) View.VISIBLE else View.GONE
-                    val tryAssets = assets.filter { it.currency.equals("TRY", true) }
-                    binding.tvChartEmpty.visibility = if (tryAssets.isEmpty()) View.VISIBLE else View.GONE
-                    binding.portfolioChart.setValues(tryAssets.map { ((it.lastPrice ?: it.costPrice) * it.quantity).toFloat() })
+                    updateDashboardAllocationChart()
 
                     binding.btnSellAsset.isEnabled = assets.any { it.quantity > 0.0 }
                     updatePageContent()
@@ -322,12 +323,9 @@ class MainActivity : AppCompatActivity() {
                 content.addView(actionButton("Excel'den içe aktar", R.color.portfolio_blue) { showPage(NAV_IMPORT); launchExcelImport() })
             }
             if (id == NAV_CATEGORIES || id == NAV_BROKERS) {
-                content.addView(TextView(this).apply {
-                    text = "Bu özet, varlık kayıtlarındaki sınıflandırma ve aracı kurum alanlarına göre hesaplanır."
-                    textSize = 13f
-                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
-                    setPadding(0, dp(12), 0, dp(12))
-                })
+                val charts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                content.addView(charts)
+                breakdownContainers[id] = charts
             }
             if (id == NAV_IMPORT) {
                 content.addView(actionButton("Excel dosyası seç (.xlsx)", R.color.portfolio_green) { launchExcelImport() })
@@ -404,6 +402,7 @@ class MainActivity : AppCompatActivity() {
         renderMarketAssets(NAV_BIST)
         renderMarketAssets(NAV_CRYPTO)
         renderMarketRates()
+        renderBreakdownPages()
         /* legacy summary text disabled: management cards provide per-record actions */
         /* pageTexts[NAV_ASSETS]?.text = if (currentAssets.isEmpty()) {
             "Henüz portföy varlığı eklenmedi."
@@ -428,30 +427,8 @@ class MainActivity : AppCompatActivity() {
             val date = SimpleDateFormat("dd.MM.yyyy", Locale("tr", "TR")).format(Date(dividend.paymentDate))
             "${dividend.ticker} • $date\nBrüt: ${currency(dividend.grossAmount, dividend.currency)} • Stopaj: ${currency(dividend.withholdingTax, dividend.currency)}\nNet temettü: ${currency(dividend.netAmount, dividend.currency)}"
         }
-        pageTexts[NAV_CATEGORIES]?.text = currentAssets.groupBy { it.category }.entries
-            .sortedByDescending { entry -> entry.value.size }
-            .joinToString("\n\n") { (category, assets) ->
-                val totals = assets.groupBy { it.currency }.entries.joinToString(" • ") { (ccy, rows) -> currency(rows.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) }, ccy) }
-                "${categoryLabel(category)} • ${assets.size} varlık\nToplam değer: $totals"
-            }.ifBlank { "Kategori dağılımı için portföye varlık ekleyin." }
-        pageTexts[NAV_BROKERS]?.text = currentAssets.groupBy { it.broker.ifBlank { "Belirtilmedi" } }
-            .entries.sortedByDescending { entry -> entry.value.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
-            .joinToString("\n\n") { (broker, assets) ->
-                val ids = assets.map { it.id }.toSet()
-                val codes = assets.map { it.currency }.distinct()
-                val detail = codes.joinToString("\n") { code ->
-                    val rows = assets.filter { it.currency.equals(code, true) }
-                    val market = rows.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) }
-                    val unrealized = rows.sumOf { it.quantity * ((it.lastPrice ?: it.costPrice) - it.costPrice) }
-                    val realized = currentTrades.filter { it.assetId in ids && it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
-                    val dividends = currentDividends.filter { it.assetId in ids && it.currency.equals(code, true) }.sumOf { it.netAmount }
-                    val capital = rows.sumOf { it.openingQuantity * it.openingCostPrice } + currentTrades.filter { it.assetId in ids && it.action == "BUY" && it.currency.equals(code, true) }.sumOf { it.quantity * it.unitPrice + it.fee }
-                    val pnl = unrealized + realized + dividends
-                    val pct = if (capital > 0.0) String.format(Locale("tr", "TR"), "%+.2f%%", pnl / capital * 100.0) else "—"
-                    "$code • Değer: ${currency(market, code)}\nToplam K/Z: ${currency(pnl, code)} ($pct)"
-                }
-                "$broker • ${assets.size} varlık\n$detail"
-            }.ifBlank { "Aracı kurum performansı için portföye varlık ekleyin." }
+        pageTexts[NAV_CATEGORIES]?.text = ""
+        pageTexts[NAV_BROKERS]?.text = ""
         pageTexts[NAV_IMPORT]?.text =
             "Excel (.xlsx) dosyasının ilk sayfasında Sembol, Varlık, Kategori, Adet ve Ortalama Maliyet sütunları bulunmalı.\n\nBu işlem mevcut portföy varlıklarını içe aktarır; işlem ve temettü geçmişini içe aktarmaz. Portfolio Pro dışa aktarma dosyaları doğrudan kullanılabilir. Aynı sembol varsa tekrar eklenmez. Önizleme onayından sonra yeni kayıtlar eklenir."
         pageTexts[NAV_MORE]?.text =
@@ -510,10 +487,153 @@ class MainActivity : AppCompatActivity() {
         binding.tvDailyProfitLoss.text = daily?.let { currency(it, displayCurrency) } ?: "Günlük karşılaştırma verisi birikiyor"
         binding.tvDailyProfitLoss.setTextColor(ContextCompat.getColor(this, if ((daily ?: 0.0) < 0.0) R.color.portfolio_orange else R.color.portfolio_text))
         binding.tvHeaderTitle.contentDescription = "Toplam portföy piyasa değeri: " + binding.tvTotalValue.text + ". Kâr zarar: " + binding.tvTotalProfitLoss.text + ". Getiri: " + binding.tvTotalProfitLossPercent.text
+        updateDashboardAllocationChart()
+        renderDashboardCharts()
     }
+
+    private fun setupDashboardCharts() {
+        val scroll = dashboardView as? android.widget.ScrollView
+        val content = scroll?.getChildAt(0) as? LinearLayout ?: return
+        val charts = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(8), 0, dp(16))
+        }
+        content.addView(charts)
+        dashboardChartsContainer = charts
+    }
+
+    private fun updateDashboardAllocationChart() {
+        val rate = currentRates.firstOrNull { it.title.equals("Dolar / TL", true) }?.value
+        val active = currentAssets.filter { it.quantity > 0.0 }
+        val converted = active.map { asset ->
+            val native = asset.quantity * (asset.lastPrice ?: asset.costPrice)
+            when {
+                asset.currency.equals(selectedSummaryCurrency, true) -> native
+                rate == null || rate <= 0.0 -> null
+                asset.currency == "USD" && selectedSummaryCurrency == "TRY" -> native * rate
+                asset.currency == "TRY" && selectedSummaryCurrency == "USD" -> native / rate
+                else -> null
+            }
+        }
+        val complete = converted.none { it == null }
+        val values = if (complete) converted.filterNotNull() else emptyList()
+        binding.portfolioChart.setValues(values.map { it.toFloat() })
+        binding.tvChartEmpty.visibility = if (values.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    private fun renderDashboardCharts() {
+        val container = dashboardChartsContainer ?: return
+        container.removeAllViews()
+        if (currentAssets.isEmpty()) return
+        val rate = currentRates.firstOrNull { it.title.equals("Dolar / TL", true) }?.value
+        val needsFx = currentAssets.any { !it.currency.equals(selectedSummaryCurrency, true) } ||
+            currentTrades.any { !it.currency.equals(selectedSummaryCurrency, true) } ||
+            currentDividends.any { !it.currency.equals(selectedSummaryCurrency, true) }
+        if (needsFx && (rate == null || rate <= 0.0)) {
+            container.addView(TextView(this).apply {
+                text = "USD/TRY kuru bekleniyor. Farklı para birimlerindeki veriler eksik toplam göstermemek için grafiklere dahil edilmedi."
+                textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                setPadding(0, dp(12), 0, dp(12))
+            })
+            return
+        }
+        fun convert(value: Double, code: String): Double? {
+            if (code.equals(selectedSummaryCurrency, true)) return value
+            if (rate == null || rate <= 0.0) return null
+            return if (code == "USD" && selectedSummaryCurrency == "TRY") value * rate
+                else if (code == "TRY" && selectedSummaryCurrency == "USD") value / rate else null
+        }
+        val categories = currentAssets.groupBy { categoryLabel(it.category) }.mapNotNull { (name, rows) ->
+            val value = rows.sumOf { asset ->
+                convert(asset.quantity * (asset.lastPrice ?: asset.costPrice), asset.currency) ?: 0.0
+            }
+            if (value > 0.0) name to value else null
+        }.sortedByDescending { it.second }
+        addPortfolioChart(container, "Varlık dağılımı", "Kategori • ${if (selectedSummaryCurrency == "TRY") "₺" else "$"} görünümü",
+            com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT, categories.map { it.second },
+            categories.map { it.first }, 220, categories.sumOf { it.second }.let { currency(it, selectedSummaryCurrency) })
+        val accounts = currentAssets.groupBy { it.broker.ifBlank { "Belirtilmedi" } }.mapNotNull { (name, rows) ->
+            val value = rows.sumOf { asset -> convert(asset.quantity * (asset.lastPrice ?: asset.costPrice), asset.currency) ?: 0.0 }
+            if (value > 0.0) name to value else null
+        }.sortedByDescending { it.second }
+        addPortfolioChart(container, "Aracı kurum dağılımı", "Piyasa değerine göre • ${selectedSummaryCurrency}",
+            com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR,
+            accounts.map { it.second }, accounts.map { it.first }, maxOf(150, accounts.size * 38 + 20),
+            suffix = if (selectedSummaryCurrency == "TRY") " ₺" else " $")
+        val monthlyLabels = (0..5).map { offset ->
+            val cal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, offset - 5) }
+            String.format(Locale("tr", "TR"), "%02d/%02d", cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.YEAR) % 100)
+        }
+        val monthly = (0..5).map { offset ->
+            val cal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, offset - 5) }
+            val m = cal.get(java.util.Calendar.MONTH); val y = cal.get(java.util.Calendar.YEAR)
+            val sells = currentTrades.filter { trade ->
+                val date = java.util.Calendar.getInstance().apply { timeInMillis = trade.executedAt }
+                trade.action == "SELL" && date.get(java.util.Calendar.MONTH) == m && date.get(java.util.Calendar.YEAR) == y
+            }.sumOf { trade -> convert(trade.realizedProfit, trade.currency) ?: 0.0 }
+            val dividends = currentDividends.filter { dividend ->
+                val date = java.util.Calendar.getInstance().apply { timeInMillis = dividend.paymentDate }
+                date.get(java.util.Calendar.MONTH) == m && date.get(java.util.Calendar.YEAR) == y
+            }.sumOf { dividend -> convert(dividend.netAmount, dividend.currency) ?: 0.0 }
+            sells + dividends
+        }
+        if (monthly.any { it != 0.0 }) addPortfolioChart(container, "Aylık gerçekleşmiş gelir", "Satış kâr/zararı + net temettü",
+            com.portfolio.app.ui.chart.PortfolioChartView.Type.BAR, monthly, monthlyLabels, 220,
+            suffix = if (selectedSummaryCurrency == "TRY") " ₺" else " $")
+    }
+
     private fun renderMarketAssets(pageId: Int) {
         val list = pageLists[pageId] ?: return
         list.removeAllViews()
+        val chartAssets = if (pageId == NAV_BIST) currentAssets.filter {
+            it.category.uppercase() in listOf("STOCK", "BIST", "HISSE", "US_STOCK")
+        } else currentAssets.filter { it.category.equals("CRYPTO", true) }
+        listOf("TRY", "USD").forEach { code ->
+            val currencyAssets = chartAssets.filter { it.currency.equals(code, true) && it.quantity > 0.0 }
+            if (currencyAssets.isNotEmpty()) {
+                val marketValues = currencyAssets.map { it.quantity * (it.lastPrice ?: it.costPrice) }
+                val invested = currencyAssets.sumOf { it.quantity * it.costPrice }
+                val marketTotal = marketValues.sum()
+                val pnlTotal = marketTotal - invested
+                val returnPct = if (invested > 0.0) pnlTotal / invested * 100.0 else 0.0
+                val summaryCard = com.google.android.material.card.MaterialCardView(this).apply {
+                    radius = dp(14).toFloat()
+                    setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+                    strokeWidth = dp(1)
+                    setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue)))
+                    layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
+                }
+                summaryCard.addView(LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(13), dp(16), dp(13))
+                    addView(TextView(this@MainActivity).apply {
+                        text = "${currencyAssets.size} varlık • ${code} portföy özeti"
+                        textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+                        setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                    })
+                    addView(TextView(this@MainActivity).apply {
+                        text = "Piyasa değeri: ${currency(marketTotal, code)}\nYatırım maliyeti: ${currency(invested, code)}\nToplam K/Z: ${currency(pnlTotal, code)} (${String.format(Locale("tr", "TR"), "%+.2f%%", returnPct)})"
+                        textSize = 14f; typeface = Typeface.DEFAULT_BOLD
+                        setTextColor(ContextCompat.getColor(this@MainActivity, if (pnlTotal < 0.0) R.color.portfolio_orange else R.color.portfolio_green))
+                        setPadding(0, dp(6), 0, 0)
+                    })
+                })
+                list.addView(summaryCard)
+                addPortfolioChart(list, "Piyasa değeri dağılımı", "Varlık bazında • $code",
+                    com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT, marketValues,
+                    currencyAssets.map { it.ticker }, 210, currency(marketValues.sum(), code))
+                val pnlValues = currencyAssets.map { ((it.lastPrice ?: it.costPrice) - it.costPrice) * it.quantity }
+                addPortfolioChart(list, "Varlık bazında kâr / zarar", "Pozisyon bazında • $code",
+                    com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR, pnlValues,
+                    currencyAssets.map { it.ticker }, maxOf(150, currencyAssets.size * 36 + 20),
+                    suffix = if (code == "TRY") " ₺" else " $")
+            }
+        }
+        chartAssets.take(6).forEach { asset ->
+            val history = currentPriceSnapshots.filter { it.assetId == asset.id }.sortedBy { it.snapshotDate }.takeLast(30)
+            if (history.size >= 2) addPortfolioChart(list, "${asset.ticker} fiyat trendi", "Son ${history.size} kayıt",
+                com.portfolio.app.ui.chart.PortfolioChartView.Type.SPARK, history.map { it.price },
+                history.map { SimpleDateFormat("dd.MM", Locale("tr", "TR")).format(Date(it.snapshotDate)) }, 54)
+        }
         if (pageId == NAV_BIST) {
             val groups = listOf(
                 "BIST Hisseleri" to currentAssets.filter { it.category.uppercase() in listOf("STOCK", "BIST", "HISSE") },
@@ -557,6 +677,12 @@ class MainActivity : AppCompatActivity() {
         column.addView(TextView(this).apply {
             text = "${formatNumber(asset.quantity)} adet • Son fiyat ${currency(price, asset.currency)}\nPiyasa değeri ${currency(value, asset.currency)} • K/Z ${currency(pnl, asset.currency)}\nKaynak: ${sourceLabel(asset.priceSource)} • ${asset.broker}"
             textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(6), 0, dp(8))
+        })
+        val history = currentPriceSnapshots.filter { it.assetId == asset.id }.sortedBy { it.snapshotDate }.takeLast(30)
+        if (history.size >= 2) column.addView(com.portfolio.app.ui.chart.PortfolioChartView(this).apply {
+            type = com.portfolio.app.ui.chart.PortfolioChartView.Type.SPARK
+            values = history.map { it.price }
+            layoutParams = LinearLayout.LayoutParams(-1, dp(42))
         })
         column.addView(actionButton("Varlığı düzenle", R.color.portfolio_blue) { showEditAssetDialog(asset) })
         card.addView(column); list.addView(card)
@@ -608,6 +734,119 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    private fun addPortfolioChart(
+        container: LinearLayout, title: String, subtitle: String,
+        type: com.portfolio.app.ui.chart.PortfolioChartView.Type,
+        values: List<Double>, labels: List<String>, height: Int = 220,
+        center: String = "", suffix: String = ""
+    ) {
+        if (values.isEmpty()) return
+        container.addView(TextView(this).apply {
+            text = title
+            textSize = 15f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+            setPadding(0, dp(18), 0, dp(3))
+        })
+        if (subtitle.isNotBlank()) container.addView(TextView(this).apply {
+            text = subtitle; textSize = 11f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            setPadding(0, 0, 0, dp(6))
+        })
+        val chart = com.portfolio.app.ui.chart.PortfolioChartView(this).apply {
+            this.type = type; this.values = values; this.labels = labels
+            centerValue = center; this.suffix = suffix
+            layoutParams = LinearLayout.LayoutParams(-1, dp(height))
+        }
+        container.addView(chart)
+    }
+
+    private fun renderBreakdownPages() {
+        val categoryContainer = breakdownContainers[NAV_CATEGORIES]
+        categoryContainer?.removeAllViews()
+        if (categoryContainer != null) {
+            if (currentAssets.isEmpty()) {
+                categoryContainer.addView(TextView(this).apply {
+                    text = "Kategori grafikleri için portföye varlık ekleyin."
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                })
+            } else listOf("TRY", "USD").forEach { code ->
+                val rows = currentAssets.filter { it.currency.equals(code, true) && it.quantity > 0.0 }
+                if (rows.isNotEmpty()) {
+                    val grouped = rows.groupBy { categoryLabel(it.category) }.mapValues { (_, items) ->
+                        items.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) }
+                    }.entries.sortedByDescending { it.value }
+                    addPortfolioChart(categoryContainer, "Kategori dağılımı", "Piyasa değeri • $code",
+                        com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT,
+                        grouped.map { it.value }, grouped.map { it.key }, 210,
+                        currency(grouped.sumOf { it.value }, code))
+                    addPortfolioChart(categoryContainer, "Kategori bazında piyasa değeri", "Yatay karşılaştırma • $code",
+                        com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR,
+                        grouped.map { it.value }, grouped.map { it.key },
+                        maxOf(150, grouped.size * 38 + 20), suffix = if (code == "TRY") " ₺" else " $")
+                }
+            }
+        }
+
+        val brokerContainer = breakdownContainers[NAV_BROKERS]
+        brokerContainer?.removeAllViews()
+        if (brokerContainer != null) {
+            val brokers = currentAssets.groupBy { it.broker.ifBlank { "Belirtilmedi" } }
+            if (brokers.isEmpty()) {
+                brokerContainer.addView(TextView(this).apply {
+                    text = "Aracı kurum analizi için portföye varlık ekleyin."
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                })
+            } else listOf("TRY", "USD").forEach { code ->
+                val data = brokers.mapNotNull { (broker, rows) ->
+                    val matching = rows.filter { it.currency.equals(code, true) && it.quantity > 0.0 }
+                    if (matching.isEmpty()) null else broker to matching.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) }
+                }.sortedByDescending { it.second }
+                if (data.isNotEmpty()) {
+                    addPortfolioChart(brokerContainer, "Aracı kurumlara göre portföy", "Piyasa değeri • $code",
+                        com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT,
+                        data.map { it.second }, data.map { it.first }, 210,
+                        currency(data.sumOf { it.second }, code))
+                    addPortfolioChart(brokerContainer, "Aracı kurum karşılaştırması", "Yatay piyasa değeri • $code",
+                        com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR,
+                        data.map { it.second }, data.map { it.first },
+                        maxOf(150, data.size * 38 + 20), suffix = if (code == "TRY") " ₺" else " $")
+                    data.forEach { (broker, _) ->
+                        val ids = brokers[broker].orEmpty().map { it.id }.toSet()
+                        val assets = currentAssets.filter { it.id in ids && it.currency.equals(code, true) }
+                        val market = assets.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) }
+                        val unrealized = assets.sumOf { it.quantity * ((it.lastPrice ?: it.costPrice) - it.costPrice) }
+                        val realized = currentTrades.filter { it.assetId in ids && it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
+                        val dividend = currentDividends.filter { it.assetId in ids && it.currency.equals(code, true) }.sumOf { it.netAmount }
+                        val capital = assets.sumOf { it.openingQuantity * it.openingCostPrice } +
+                            currentTrades.filter { it.assetId in ids && it.action == "BUY" && it.currency.equals(code, true) }.sumOf { it.quantity * it.unitPrice + it.fee }
+                        val pnl = unrealized + realized + dividend
+                        val pct = if (capital > 0.0) pnl / capital * 100.0 else 0.0
+                        val card = com.google.android.material.card.MaterialCardView(this).apply {
+                            radius = dp(14).toFloat()
+                            setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+                            strokeWidth = dp(1)
+                            setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue)))
+                            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }
+                        }
+                        card.addView(LinearLayout(this).apply {
+                            orientation = LinearLayout.VERTICAL; setPadding(dp(15), dp(12), dp(15), dp(12))
+                            addView(TextView(this@MainActivity).apply {
+                                text = "$broker • ${assets.size} varlık"; textSize = 14f; typeface = Typeface.DEFAULT_BOLD
+                                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+                            })
+                            addView(TextView(this@MainActivity).apply {
+                                text = "Piyasa değeri: ${currency(market, code)}\nGerçekleşmemiş K/Z: ${currency(unrealized, code)}\nGerçekleşmiş K/Z: ${currency(realized, code)}\nNet temettü: ${currency(dividend, code)}\nToplam getiri: ${currency(pnl, code)} (${String.format(Locale("tr", "TR"), "%+.2f%%", pct)})"
+                                textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                                setPadding(0, dp(5), 0, 0)
+                            })
+                        })
+                        brokerContainer.addView(card)
+                    }
+                }
+            }
+        }
+    }
+
     private fun renderAnalytics() {
         val container = analyticsContainer ?: return
         container.removeAllViews()
@@ -618,20 +857,6 @@ class MainActivity : AppCompatActivity() {
                 setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
             })
             return
-        }
-        fun addChart(title: String, subtitle: String,
-                     type: com.portfolio.app.ui.chart.AnalyticsChartView.ChartType,
-                     values: List<Double>, labels: List<String>) {
-            if (values.isEmpty()) return
-            container.addView(TextView(this).apply {
-                text = "$title\n$subtitle"; textSize = 15f; typeface = Typeface.DEFAULT_BOLD
-                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
-                setPadding(0, dp(18), 0, dp(8))
-            })
-            container.addView(com.portfolio.app.ui.chart.AnalyticsChartView(this).apply {
-                chartType = type; chartValues = values; chartLabels = labels
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(220))
-            })
         }
         listOf("TRY", "USD").forEach { code ->
             val group = active.filter { it.currency.equals(code, true) }
@@ -644,38 +869,59 @@ class MainActivity : AppCompatActivity() {
                 })
                 val market = group.map { it.quantity * (it.lastPrice ?: it.costPrice) }
                 val unrealized = group.map { ((it.lastPrice ?: it.costPrice) - it.costPrice) * it.quantity }
-                addChart("Varlık dağılımı", "Güncel piyasa değerine göre • $code", com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.DONUT, market, group.map { it.ticker })
-                addChart("Gerçekleşmemiş kâr / zarar", "Ortalama maliyet ile son fiyat farkı • $code", com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, unrealized, group.map { it.ticker })
+                addPortfolioChart(container, "Varlık dağılımı", "Güncel piyasa değerine göre • $code",
+                    com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT, market, group.map { it.ticker }, 220,
+                    currency(market.sum(), code))
+                addPortfolioChart(container, "Gerçekleşmemiş kâr / zarar", "Ortalama maliyet ile son fiyat farkı • $code",
+                    com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR, unrealized, group.map { it.ticker },
+                    maxOf(160, group.size * 36 + 20), suffix = if (code == "TRY") " ₺" else " $")
                 val realized = currentTrades.filter { it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
-                container.addView(TextView(this).apply {
-                    text = "Gerçekleşmiş satış kâr/zararı: ${currency(realized, code)}"
-                    textSize = 13f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text)); setPadding(0, dp(8), 0, dp(8))
-                })
+                val dividends = currentDividends.filter { it.currency.equals(code, true) }.sumOf { it.netAmount }
+                val pnlCard = TextView(this).apply {
+                    text = "Gerçekleşmiş satış K/Z: ${currency(realized, code)}\nNet temettü: ${currency(dividends, code)}\nToplam gerçekleşmiş gelir: ${currency(realized + dividends, code)}"
+                    textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                    setPadding(0, dp(8), 0, dp(4))
+                }
+                container.addView(pnlCard)
             }
         }
         listOf("TRY", "USD").forEach { code ->
-            val monthly = (0..5).map { offset ->
+            val monthlyLabels = (0..5).map { offset ->
+                val cal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, offset - 5) }
+                String.format(Locale("tr", "TR"), "%02d/%02d", cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.YEAR) % 100)
+            }
+            val monthlyValues = (0..5).map { offset ->
                 val cal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, offset - 5) }
                 val month = cal.get(java.util.Calendar.MONTH); val year = cal.get(java.util.Calendar.YEAR)
-                currentDividends.filter { dividend ->
-                    val d = java.util.Calendar.getInstance().apply { timeInMillis = dividend.paymentDate }
-                    dividend.currency.equals(code, true) && d.get(java.util.Calendar.MONTH) == month && d.get(java.util.Calendar.YEAR) == year
+                val sells = currentTrades.filter { trade ->
+                    val date = java.util.Calendar.getInstance().apply { timeInMillis = trade.executedAt }
+                    trade.action == "SELL" && trade.currency.equals(code, true) &&
+                        date.get(java.util.Calendar.MONTH) == month && date.get(java.util.Calendar.YEAR) == year
+                }.sumOf { it.realizedProfit }
+                val divs = currentDividends.filter { dividend ->
+                    val date = java.util.Calendar.getInstance().apply { timeInMillis = dividend.paymentDate }
+                    dividend.currency.equals(code, true) && date.get(java.util.Calendar.MONTH) == month &&
+                        date.get(java.util.Calendar.YEAR) == year
                 }.sumOf { it.netAmount }
+                sells + divs
             }
-            if (monthly.any { it > 0.0 }) addChart("Temettü nakit akışı", "Son 6 ay • $code", com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.BAR, monthly,
-                (0..5).map { offset -> val cal = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, offset - 5) }; String.format(Locale("tr", "TR"), "%02d/%02d", cal.get(java.util.Calendar.MONTH)+1, cal.get(java.util.Calendar.YEAR)%100) })
+            if (monthlyValues.any { it != 0.0 }) addPortfolioChart(container, "Aylık gerçekleşmiş gelir", "Satış K/Z + net temettü • $code",
+                com.portfolio.app.ui.chart.PortfolioChartView.Type.BAR, monthlyValues, monthlyLabels, 220,
+                suffix = if (code == "TRY") " ₺" else " $")
         }
         active.sortedByDescending { it.quantity * (it.lastPrice ?: it.costPrice) }.take(8).forEach { asset ->
             val history = currentPriceSnapshots.filter { it.assetId == asset.id }.sortedBy { it.snapshotDate }.takeLast(30)
             if (history.size >= 2) {
                 val labels = history.map { SimpleDateFormat("dd.MM", Locale("tr", "TR")).format(Date(it.snapshotDate)) }
-                addChart(asset.ticker + " fiyat geçmişi", "Son " + history.size + " kayıt • " + asset.currency,
-                    com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.LINE, history.map { it.price }, labels)
+                addPortfolioChart(container, asset.ticker + " fiyat geçmişi", "Son ${history.size} kayıt • ${asset.currency}",
+                    com.portfolio.app.ui.chart.PortfolioChartView.Type.AREA, history.map { it.price }, labels, 210,
+                    suffix = if (asset.currency == "TRY") " ₺" else " $")
             }
         }
         container.addView(TextView(this).apply {
-            text = "Günlük kâr/zarar, bir önceki güne ait kaydedilmiş varlık fiyatlarıyla karşılaştırılır. Bu özellik 4.0 sürümünden itibaren fiyat geçmişi biriktirir; ilk karşılaştırma için en az iki farklı gün fiyat kaydı gerekir."
-            textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(16), 0, dp(24))
+            text = "Fiyat geçmişi 4.0 sürümünden itibaren cihazda biriktirilir; geçmişe dönük veri üretilmez. İlk fiyat karşılaştırması için en az iki farklı gün kaydı gerekir."
+            textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            setPadding(0, dp(16), 0, dp(24))
         })
     }
 
