@@ -581,6 +581,32 @@ class MainActivity : AppCompatActivity() {
             val currencyAssets = chartAssets.filter { it.currency.equals(code, true) && it.quantity > 0.0 }
             if (currencyAssets.isNotEmpty()) {
                 val marketValues = currencyAssets.map { it.quantity * (it.lastPrice ?: it.costPrice) }
+                val invested = currencyAssets.sumOf { it.quantity * it.costPrice }
+                val marketTotal = marketValues.sum()
+                val pnlTotal = marketTotal - invested
+                val returnPct = if (invested > 0.0) pnlTotal / invested * 100.0 else 0.0
+                val summaryCard = com.google.android.material.card.MaterialCardView(this).apply {
+                    radius = dp(14).toFloat()
+                    setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+                    strokeWidth = dp(1)
+                    setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue)))
+                    layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
+                }
+                summaryCard.addView(LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(13), dp(16), dp(13))
+                    addView(TextView(this@MainActivity).apply {
+                        text = "${currencyAssets.size} varlık • ${code} portföy özeti"
+                        textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+                        setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                    })
+                    addView(TextView(this@MainActivity).apply {
+                        text = "Piyasa değeri: ${currency(marketTotal, code)}\nYatırım maliyeti: ${currency(invested, code)}\nToplam K/Z: ${currency(pnlTotal, code)} (${String.format(Locale("tr", "TR"), "%+.2f%%", returnPct)})"
+                        textSize = 14f; typeface = Typeface.DEFAULT_BOLD
+                        setTextColor(ContextCompat.getColor(this@MainActivity, if (pnlTotal < 0.0) R.color.portfolio_orange else R.color.portfolio_green))
+                        setPadding(0, dp(6), 0, 0)
+                    })
+                })
+                list.addView(summaryCard)
                 addPortfolioChart(list, "Piyasa değeri dağılımı", "Varlık bazında • $code",
                     com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT, marketValues,
                     currencyAssets.map { it.ticker }, 210, currency(marketValues.sum(), code))
