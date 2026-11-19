@@ -14,6 +14,19 @@ data class ImportedAsset(
     val currency: String, val costPerUnit: Double, val broker: String,
     val priceSource: String, val marketSymbol: String
 )
+// Backward-compatible model used by the legacy single-sheet import flow.
+data class ImportedHolding(
+    val ticker: String,
+    val name: String,
+    val quantity: Double,
+    val costPrice: Double,
+    val category: String,
+    val portfolioName: String,
+    val currency: String,
+    val lastPrice: Double?,
+    val broker: String,
+    val priceSource: String
+)
 data class ImportedTrade(
     val sourceId: Long?, val sourceAssetId: Long?, val ticker: String,
     val action: String, val quantity: Double, val unitPrice: Double, val fee: Double,
