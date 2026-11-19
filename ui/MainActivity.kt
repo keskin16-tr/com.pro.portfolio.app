@@ -427,30 +427,8 @@ class MainActivity : AppCompatActivity() {
             val date = SimpleDateFormat("dd.MM.yyyy", Locale("tr", "TR")).format(Date(dividend.paymentDate))
             "${dividend.ticker} • $date\nBrüt: ${currency(dividend.grossAmount, dividend.currency)} • Stopaj: ${currency(dividend.withholdingTax, dividend.currency)}\nNet temettü: ${currency(dividend.netAmount, dividend.currency)}"
         }
-        pageTexts[NAV_CATEGORIES]?.text = currentAssets.groupBy { it.category }.entries
-            .sortedByDescending { entry -> entry.value.size }
-            .joinToString("\n\n") { (category, assets) ->
-                val totals = assets.groupBy { it.currency }.entries.joinToString(" • ") { (ccy, rows) -> currency(rows.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) }, ccy) }
-                "${categoryLabel(category)} • ${assets.size} varlık\nToplam değer: $totals"
-            }.ifBlank { "Kategori dağılımı için portföye varlık ekleyin." }
-        pageTexts[NAV_BROKERS]?.text = currentAssets.groupBy { it.broker.ifBlank { "Belirtilmedi" } }
-            .entries.sortedByDescending { entry -> entry.value.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
-            .joinToString("\n\n") { (broker, assets) ->
-                val ids = assets.map { it.id }.toSet()
-                val codes = assets.map { it.currency }.distinct()
-                val detail = codes.joinToString("\n") { code ->
-                    val rows = assets.filter { it.currency.equals(code, true) }
-                    val market = rows.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) }
-                    val unrealized = rows.sumOf { it.quantity * ((it.lastPrice ?: it.costPrice) - it.costPrice) }
-                    val realized = currentTrades.filter { it.assetId in ids && it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
-                    val dividends = currentDividends.filter { it.assetId in ids && it.currency.equals(code, true) }.sumOf { it.netAmount }
-                    val capital = rows.sumOf { it.openingQuantity * it.openingCostPrice } + currentTrades.filter { it.assetId in ids && it.action == "BUY" && it.currency.equals(code, true) }.sumOf { it.quantity * it.unitPrice + it.fee }
-                    val pnl = unrealized + realized + dividends
-                    val pct = if (capital > 0.0) String.format(Locale("tr", "TR"), "%+.2f%%", pnl / capital * 100.0) else "—"
-                    "$code • Değer: ${currency(market, code)}\nToplam K/Z: ${currency(pnl, code)} ($pct)"
-                }
-                "$broker • ${assets.size} varlık\n$detail"
-            }.ifBlank { "Aracı kurum performansı için portföye varlık ekleyin." }
+        pageTexts[NAV_CATEGORIES]?.text = ""
+        pageTexts[NAV_BROKERS]?.text = ""
         pageTexts[NAV_IMPORT]?.text =
             "Excel (.xlsx) dosyasının ilk sayfasında Sembol, Varlık, Kategori, Adet ve Ortalama Maliyet sütunları bulunmalı.\n\nBu işlem mevcut portföy varlıklarını içe aktarır; işlem ve temettü geçmişini içe aktarmaz. Portfolio Pro dışa aktarma dosyaları doğrudan kullanılabilir. Aynı sembol varsa tekrar eklenmez. Önizleme onayından sonra yeni kayıtlar eklenir."
         pageTexts[NAV_MORE]?.text =
@@ -596,15 +574,19 @@ class MainActivity : AppCompatActivity() {
         val chartAssets = if (pageId == NAV_BIST) currentAssets.filter {
             it.category.uppercase() in listOf("STOCK", "BIST", "HISSE", "US_STOCK")
         } else currentAssets.filter { it.category.equals("CRYPTO", true) }
-        if (chartAssets.isNotEmpty()) {
-            val marketValues = chartAssets.map { it.quantity * (it.lastPrice ?: it.costPrice) }
-            addPortfolioChart(list, "Piyasa değeri dağılımı", "Varlık bazında • portföy para birimleri ayrı değerlendirilir",
-                com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT, marketValues,
-                chartAssets.map { it.ticker }, 210)
-            val pnlValues = chartAssets.map { ((it.lastPrice ?: it.costPrice) - it.costPrice) * it.quantity }
-            addPortfolioChart(list, "Varlık bazında kâr / zarar", "Pozisyon bazında karşılaştırma",
-                com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR, pnlValues,
-                chartAssets.map { it.ticker }, maxOf(150, chartAssets.size * 36 + 20))
+        listOf("TRY", "USD").forEach { code ->
+            val currencyAssets = chartAssets.filter { it.currency.equals(code, true) && it.quantity > 0.0 }
+            if (currencyAssets.isNotEmpty()) {
+                val marketValues = currencyAssets.map { it.quantity * (it.lastPrice ?: it.costPrice) }
+                addPortfolioChart(list, "Piyasa değeri dağılımı", "Varlık bazında • $code",
+                    com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT, marketValues,
+                    currencyAssets.map { it.ticker }, 210, currency(marketValues.sum(), code))
+                val pnlValues = currencyAssets.map { ((it.lastPrice ?: it.costPrice) - it.costPrice) * it.quantity }
+                addPortfolioChart(list, "Varlık bazında kâr / zarar", "Pozisyon bazında • $code",
+                    com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR, pnlValues,
+                    currencyAssets.map { it.ticker }, maxOf(150, currencyAssets.size * 36 + 20),
+                    suffix = if (code == "TRY") " ₺" else " $")
+            }
         }
         chartAssets.take(6).forEach { asset ->
             val history = currentPriceSnapshots.filter { it.assetId == asset.id }.sortedBy { it.snapshotDate }.takeLast(30)
