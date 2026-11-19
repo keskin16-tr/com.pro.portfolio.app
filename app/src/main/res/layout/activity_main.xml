@@ -200,6 +200,38 @@
                         android:textColor="@color/portfolio_text"
                         android:textSize="32sp"
                         android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:text="Toplam kâr / zarar"
+                        android:textColor="@color/portfolio_muted"
+                        android:textSize="12sp" />
+                    <TextView
+                        android:id="@+id/tvTotalProfitLoss"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="₺0,00"
+                        android:textColor="@color/portfolio_green"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="Günlük kâr / zarar"
+                        android:textColor="@color/portfolio_muted"
+                        android:textSize="12sp" />
+                    <TextView
+                        android:id="@+id/tvDailyProfitLoss"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="TRY • Veri birikiyor"
+                        android:textColor="@color/portfolio_text"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -230,22 +262,7 @@
                             android:textColor="@color/portfolio_muted"
                             android:textSize="11sp" />
                     </LinearLayout>
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="18dp"
-                        android:text="Toplam net temettü"
-                        android:textColor="@color/portfolio_muted"
-                        android:textSize="12sp" />
-                    <TextView
-                        android:id="@+id/tvDividendTotal"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:text="₺0,00"
-                        android:textColor="@color/portfolio_green"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
+
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnAddDividend"
                         android:layout_width="match_parent"
@@ -300,7 +317,7 @@
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
                         android:gravity="center"
-                        android:text="Dağılım grafiği için\nvarlık ekleyin"
+                        android:text="TL dağılım grafiği için\nTL cinsinden varlık ekleyin"
                         android:textColor="@color/portfolio_muted"
                         android:textSize="13sp" />
                 </FrameLayout>

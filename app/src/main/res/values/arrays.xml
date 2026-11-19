@@ -2,6 +2,7 @@
 <resources>
     <string-array name="asset_category_labels">
         <item>Hisse (BIST)</item>
+        <item>Amerikan Borsaları</item>
         <item>Yatırım Fonu</item>
         <item>Kripto Para</item>
         <item>Döviz</item>
@@ -10,6 +11,17 @@
         <item>Tahvil / Bono</item>
         <item>Nakit</item>
         <item>Diğer</item>
+    </string-array>
+    <string-array name="asset_currency_labels">
+        <item>Türk Lirası (TRY)</item>
+        <item>ABD Doları (USD)</item>
+    </string-array>
+    <string-array name="price_source_labels">
+        <item>Otomatik (kategoriye göre)</item>
+        <item>Yahoo Finance</item>
+        <item>CoinGecko</item>
+        <item>Frankfurter (Döviz)</item>
+        <item>Elle giriş</item>
     </string-array>
     <string-array name="broker_names">
         <item>Belirtilmedi</item>

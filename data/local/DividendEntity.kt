@@ -15,5 +15,6 @@ data class DividendEntity(
  val currency:String="TRY",
  val exDate:Long=System.currentTimeMillis(),
  val paymentDate:Long=System.currentTimeMillis(),
- val note:String=""
+ val note:String="",
+ val tradeId:Long?=null
 )
