@@ -36,6 +36,7 @@ import com.portfolio.app.data.local.AssetEntity
 import com.portfolio.app.data.local.DividendEntity
 import com.portfolio.app.data.local.TradeEntity
 import com.portfolio.app.data.local.PortfolioSnapshotEntity
+import com.portfolio.app.data.local.AssetPriceSnapshotEntity
 import com.portfolio.app.data.remote.MarketRate
 import com.portfolio.app.databinding.ActivityMainBinding
 import com.portfolio.app.ui.adapter.AssetAdapter
@@ -63,6 +64,11 @@ class MainActivity : AppCompatActivity() {
     private var currentDividends: List<DividendEntity> = emptyList()
     private var currentSnapshots: List<PortfolioSnapshotEntity> = emptyList()
     private var currentRates: List<MarketRate> = emptyList()
+    private var currentPriceSnapshots: List<AssetPriceSnapshotEntity> = emptyList()
+    private var tradeSearchQuery = ""
+    private var tradeActionFilter = "Tümü"
+    private var tradeCurrencyFilter = "Tümü"
+    private var selectedSummaryCurrency = "TRY"
     private var dailyPnlTry: Double? = null
     private var dailyPnlUsd: Double? = null
     private val clockHandler = Handler(Looper.getMainLooper())
@@ -102,6 +108,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnTopAddDividend.setOnClickListener { showDividendDialog() }
         binding.btnTopManageAssets.setOnClickListener { showPage(NAV_ASSETS) }
         binding.btnTopManageTrades.setOnClickListener { showPage(NAV_TRADES) }
+        binding.btnCurrencyToggle.setOnClickListener { selectedSummaryCurrency = if (selectedSummaryCurrency == "TRY") "USD" else "TRY"; updateSummary() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -138,6 +145,11 @@ class MainActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.priceSnapshots.collect { currentPriceSnapshots = it; renderAnalytics() }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.dailyPnlTry.collect { dailyPnlTry = it; updateSummary() }
             }
         }
@@ -148,7 +160,7 @@ class MainActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.rates.collect { currentRates = it; renderMarketRates() }
+                viewModel.rates.collect { currentRates = it; updateSummary(); renderMarketRates() }
             }
         }
     }
