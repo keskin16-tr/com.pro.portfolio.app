@@ -200,7 +200,7 @@ class PortfolioRepository(private val database: AppDatabase) {
                     localId?.let { assetDao.getById(it) }
                 } else {
                     val match = backup.assets.firstOrNull { it.ticker.equals(item.ticker, true) }
-                    val localId = match?.let { sourceToLocal[it.sourceId] }
+                    val localId = match?.sourceId?.let { sourceToLocal[it] }
                     localId?.let { assetDao.getById(it) }
                         ?: assetDao.getAssetsOnce().firstOrNull { it.ticker.equals(item.ticker, true) && it.currency.equals(item.currency, true) }
                 } ?: return@forEach
