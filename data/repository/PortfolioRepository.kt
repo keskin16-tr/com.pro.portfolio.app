@@ -124,6 +124,8 @@ class PortfolioRepository(private val database: AppDatabase) {
 
     suspend fun restorePortfolio(backup: ImportedPortfolio, overwrite: Boolean): RestoreResult {
         require(backup.assets.isNotEmpty()) { "Yedekte varlık bulunamadı." }
+        val sourceIds = backup.assets.mapNotNull { it.sourceId }
+        require(sourceIds.distinct().size == sourceIds.size) { "Varlık ID alanında tekrar eden kayıt bulundu." }
         require(backup.assets.all { it.currency in listOf("TRY", "USD") }) {
             "Bu sürümde yalnızca TRY ve USD varlıklar destekleniyor."
         }
@@ -195,15 +197,16 @@ class PortfolioRepository(private val database: AppDatabase) {
             val existingFingerprints = existingTrades.map { fingerprint(it.assetId, it.action, it.quantity, it.unitPrice, it.fee, it.executedAt, it.currency, it.note) }.toMutableSet()
 
             backup.trades.sortedBy { it.executedAt }.forEach { item ->
-                val asset = if (item.sourceAssetId != null) {
-                    val localId = sourceToLocal[item.sourceAssetId]
-                    localId?.let { assetDao.getById(it) }
-                } else {
-                    val match = backup.assets.firstOrNull { it.ticker.equals(item.ticker, true) }
-                    val localId = match?.sourceId?.let { sourceToLocal[it] }
-                    localId?.let { assetDao.getById(it) }
-                        ?: assetDao.getAssetsOnce().firstOrNull { it.ticker.equals(item.ticker, true) && it.currency.equals(item.currency, true) }
-                } ?: return@forEach
+                val sourceAsset = backup.assets.firstOrNull { asset ->
+                    (item.sourceAssetId != null && asset.sourceId == item.sourceAssetId) ||
+                        asset.ticker.equals(item.ticker, true)
+                }
+                val mappedId = item.sourceAssetId?.let { sourceToLocal[it] }
+                    ?: sourceAsset?.sourceId?.let { sourceToLocal[it] }
+                val asset = mappedId?.let { assetDao.getById(it) }
+                    ?: assetDao.getAssetsOnce().firstOrNull {
+                        it.ticker.equals(item.ticker, true) && it.currency.equals(item.currency, true)
+                    } ?: return@forEach
                 val key = fingerprint(asset.id, item.action, item.quantity, item.unitPrice, item.fee, item.executedAt, item.currency, item.note)
                 if (!overwrite && (key in existingFingerprints || !acceptedAssets.containsKey(asset.ticker.uppercase() + "|" + asset.currency.uppercase()))) {
                     skippedTrades++
