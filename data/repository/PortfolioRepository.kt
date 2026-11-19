@@ -160,9 +160,9 @@ class PortfolioRepository(private val database: AppDatabase) {
                     skippedAssets++
                     return@forEach
                 }
-                val related = backup.trades.filter { trade ->
+                val related = backup.trades.filter { trade -> trade.applied && (
                     (item.sourceId != null && trade.sourceAssetId == item.sourceId) ||
-                        (trade.sourceAssetId == null && trade.ticker.equals(item.ticker, true))
+                        (trade.sourceAssetId == null && trade.ticker.equals(item.ticker, true)))
                 }.sortedBy { it.executedAt }
                 val openingQuantity = if (related.isEmpty()) item.quantity else
                     item.quantity - related.filter { it.action == "BUY" }.sumOf { it.quantity } +
@@ -214,7 +214,7 @@ class PortfolioRepository(private val database: AppDatabase) {
                     id = if (overwrite) item.sourceId?.takeIf { it > 0L } ?: 0L else 0L,
                     assetId = asset.id, action = item.action, quantity = item.quantity,
                     unitPrice = item.unitPrice, fee = item.fee, realizedProfit = item.realizedProfit ?: 0.0,
-                    executedAt = item.executedAt, note = item.note, currency = item.currency
+                    executedAt = item.executedAt, note = item.note, currency = item.currency, applied = item.applied
                 ))
                 if (item.action == "DIVIDEND") {
                     dividendDao.insert(DividendEntity(
@@ -315,7 +315,7 @@ class PortfolioRepository(private val database: AppDatabase) {
         val asset = assetDao.getById(assetId) ?: error("Varlık bulunamadı")
         var quantity = asset.openingQuantity
         var averageCost = asset.openingCostPrice
-        tradeDao.getForAssetOnce(assetId).filter { it.action != "DIVIDEND" }.forEach { trade ->
+        tradeDao.getForAssetOnce(assetId).filter { it.applied && it.action != "DIVIDEND" }.forEach { trade ->
             if (trade.action == "BUY") {
                 val nextQuantity = quantity + trade.quantity
                 averageCost = if (nextQuantity > 0.0) {
