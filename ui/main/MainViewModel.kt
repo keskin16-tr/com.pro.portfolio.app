@@ -3,6 +3,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.portfolio.app.data.local.AppDatabase
+import com.portfolio.app.data.local.RatesCacheManager
 import com.portfolio.app.data.local.AssetEntity
 import com.portfolio.app.data.local.DividendEntity
 import com.portfolio.app.data.local.TradeEntity
@@ -24,8 +25,26 @@ class MainViewModel(application:Application):AndroidViewModel(application){
  private val repository=PortfolioRepository(database)
  private val marketData=MarketDataRepository()
  private val marketRates=MarketRatesRepository()
- private val _rates= kotlinx.coroutines.flow.MutableStateFlow<List<MarketRate>>(emptyList())
+ private val ratesCache=RatesCacheManager(application)
+ private val _rates= kotlinx.coroutines.flow.MutableStateFlow(ratesCache.read())
  val rates:StateFlow<List<MarketRate>> = _rates
+ private val _ratesSyncing = kotlinx.coroutines.flow.MutableStateFlow(false)
+ val ratesSyncing: StateFlow<Boolean> = _ratesSyncing
+ private suspend fun syncRates() {
+  if (_ratesSyncing.value) return
+  _ratesSyncing.value = true
+  try {
+   val fresh = marketRates.fetchRates().filter { it.value.isFinite() && it.value > 0.0 }
+   if (fresh.isNotEmpty()) {
+    ratesCache.write(fresh)
+    _rates.value = fresh
+   }
+  } catch (_: Exception) {
+   // Keep the last successful cached rates visible while offline/provider is unavailable.
+  } finally {
+   _ratesSyncing.value = false
+  }
+ }
  private val _priceSnapshots=kotlinx.coroutines.flow.MutableStateFlow<List<AssetPriceSnapshotEntity>>(emptyList())
  val priceSnapshots:StateFlow<List<AssetPriceSnapshotEntity>> = _priceSnapshots
  private val _dailyPnlTry=kotlinx.coroutines.flow.MutableStateFlow<Double?>(null)
@@ -51,12 +70,12 @@ class MainViewModel(application:Application):AndroidViewModel(application){
     runCatching { _priceSnapshots.value = database.assetPriceSnapshotDao().getAll() }
     _dailyPnlTry.value=runCatching{repository.dailyProfitLoss("TRY")}.getOrNull()
     _dailyPnlUsd.value=runCatching{repository.dailyProfitLoss("USD")}.getOrNull()
-    runCatching{_rates.value=marketRates.fetchRates()}
+    syncRates()
     delay(60_000L)
    }
   }
  }
- fun refreshRates(){viewModelScope.launch{runCatching{_rates.value=marketRates.fetchRates()}}}
+ fun refreshRates(){viewModelScope.launch{syncRates()}}
  fun addAsset(name:String,ticker:String,quantity:Double,costPrice:Double,category:String,broker:String,currency:String,priceSource:String,manualPrice:Double?){viewModelScope.launch{runCatching{repository.recordBuy(name,ticker,quantity,costPrice,category=category,currency=currency,broker=broker,priceSource=priceSource,manualPrice=manualPrice)}}}
  fun importHoldings(rows:List<ImportedHolding>,onResult:(Result<Pair<Int,Int>>)->Unit){viewModelScope.launch{onResult(runCatching{repository.importHoldings(rows)})}}
  fun classifyAsset(assetId:Long,category:String,broker:String,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.classifyAsset(assetId,category,broker)})}}
