@@ -216,10 +216,10 @@ class PortfolioRepository(private val database: AppDatabase) {
                 val tradeId = tradeDao.insert(TradeEntity(
                     id = if (overwrite) item.sourceId?.takeIf { it > 0L } ?: 0L else 0L,
                     assetId = asset.id, action = item.action, quantity = item.quantity,
-                    unitPrice = item.unitPrice, fee = item.fee, realizedProfit = item.realizedProfit ?: 0.0,
+                    unitPrice = item.unitPrice, fee = item.fee, realizedProfit = if (item.applied) item.realizedProfit ?: 0.0 else 0.0,
                     executedAt = item.executedAt, note = item.note, currency = item.currency, applied = item.applied
                 ))
-                if (item.action == "DIVIDEND") {
+                if (item.action == "DIVIDEND" && item.applied) {
                     dividendDao.insert(DividendEntity(
                         assetId = asset.id, ticker = asset.ticker, quantityAtPayment = asset.quantity,
                         grossAmount = item.unitPrice, withholdingTax = item.fee,
