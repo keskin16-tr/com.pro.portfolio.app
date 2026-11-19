@@ -12,7 +12,8 @@ class MarketRatesRepository {
         val eur=runCatching{meta("EURTRY=X")}.getOrNull()
         val gold=runCatching{meta("GC=F")}.getOrNull()
         val silver=runCatching{meta("SI=F")}.getOrNull()
-        val usdNow=usd?.regularMarketPrice
+        val fallbackUsd = if (usd?.regularMarketPrice == null) runCatching { FrankfurterApiService.instance.getExchangeRates("USD", "TRY").rates["TRY"] }.getOrNull() else null
+        val usdNow=usd?.regularMarketPrice ?: fallbackUsd
         val eurNow=eur?.regularMarketPrice
         val usdPrev=usd?.previousClose
         val eurPrev=eur?.previousClose
@@ -22,7 +23,7 @@ class MarketRatesRepository {
         val silverPrev=silver?.previousClose
         val now=System.currentTimeMillis()
         val rows=mutableListOf<MarketRate>()
-        if(usdNow!=null) rows += MarketRate("Dolar / TL",usdNow,"TRY",percent(usdNow,usdPrev),"Yahoo Finance",now)
+        if(usdNow!=null) rows += MarketRate("Dolar / TL",usdNow,"TRY",percent(usdNow,usdPrev),if(usd?.regularMarketPrice != null) "Yahoo Finance" else "Frankfurter • günlük referans",now)
         if(eurNow!=null) rows += MarketRate("Euro / TL",eurNow,"TRY",percent(eurNow,eurPrev),"Yahoo Finance",now)
         if(usdNow!=null&&goldNow!=null) {
             val gram=goldNow*usdNow/31.1034768
