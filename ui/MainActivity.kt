@@ -123,9 +123,7 @@ class MainActivity : AppCompatActivity() {
                     binding.tvAssetCount.text = getString(R.string.asset_count, assets.size)
                     binding.tvHoldingsCount.text = "${assets.size} kayıt"
                     binding.tvEmptyState.visibility = if (assets.isEmpty()) View.VISIBLE else View.GONE
-                    val tryAssets = assets.filter { it.currency.equals("TRY", true) }
-                    binding.tvChartEmpty.visibility = if (tryAssets.isEmpty()) View.VISIBLE else View.GONE
-                    binding.portfolioChart.setValues(tryAssets.map { ((it.lastPrice ?: it.costPrice) * it.quantity).toFloat() })
+                    updateDashboardAllocationChart()
 
                     binding.btnSellAsset.isEnabled = assets.any { it.quantity > 0.0 }
                     updatePageContent()
@@ -603,7 +601,7 @@ class MainActivity : AppCompatActivity() {
             addPortfolioChart(list, "Piyasa değeri dağılımı", "Varlık bazında • portföy para birimleri ayrı değerlendirilir",
                 com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT, marketValues,
                 chartAssets.map { it.ticker }, 210)
-            val pnlValues = chartAssets.map { (it.lastPrice ?: it.costPrice - it.costPrice) * it.quantity }
+            val pnlValues = chartAssets.map { ((it.lastPrice ?: it.costPrice) - it.costPrice) * it.quantity }
             addPortfolioChart(list, "Varlık bazında kâr / zarar", "Pozisyon bazında karşılaştırma",
                 com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR, pnlValues,
                 chartAssets.map { it.ticker }, maxOf(150, chartAssets.size * 36 + 20))
