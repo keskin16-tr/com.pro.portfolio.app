@@ -37,19 +37,19 @@ object ExcelImporter {
         if (rows.isEmpty()) error("Excel sayfasında veri bulunamadı.")
         val headers = rows.first().mapIndexed { index, value -> normalize(value) to index }.toMap()
         fun column(vararg names: String): Int? = names.firstNotNullOfOrNull { headers[normalize(it)] }
-        val tickerCol = column("Sembol", "Ticker", "Symbol", "Hisse Kodu", "Kod")
+        val tickerCol = column("Sembol", "Ticker", "Symbol", "Hisse Kodu", "Kod", "symbol")
             ?: error("Sembol/Ticker başlığı bulunamadı.")
-        val nameCol = column("Varlık", "Varlık Adı", "Ad", "Name")
-        val categoryCol = column("Kategori", "Category", "Tür", "Tip")
-        val portfolioCol = column("Portföy", "Portfolio")
-        val quantityCol = column("Adet", "Miktar", "Quantity", "Qty")
+        val nameCol = column("Varlık", "Varlık Adı", "Ad", "Name", "name")
+        val categoryCol = column("Kategori", "Category", "Tür", "Tip", "category")
+        val portfolioCol = column("Portföy", "Portfolio", "account")
+        val quantityCol = column("Adet", "Miktar", "Quantity", "Qty", "quantity")
             ?: error("Adet/Quantity başlığı bulunamadı.")
-        val costCol = column("Ortalama Maliyet", "Maliyet", "Alış Fiyatı", "Cost Price", "Average Cost")
+        val costCol = column("Ortalama Maliyet", "Maliyet", "Alış Fiyatı", "Cost Price", "Average Cost", "cost_per_unit")
             ?: error("Ortalama maliyet başlığı bulunamadı.")
-        val lastCol = column("Son Fiyat", "Güncel Fiyat", "Last Price", "Price")
-        val currencyCol = column("Para Birimi", "Currency")
-        val brokerCol = column("Aracı Kurum", "Kurum", "Broker", "Brokerage")
-        val sourceCol = column("Fiyat Kaynağı", "Price Source", "Provider")
+        val lastCol = column("Son Fiyat", "Güncel Fiyat", "Last Price", "Price", "unit_price")
+        val currencyCol = column("Para Birimi", "Currency", "currency")
+        val brokerCol = column("Aracı Kurum", "Kurum", "Broker", "Brokerage", "account")
+        val sourceCol = column("Fiyat Kaynağı", "Price Source", "Provider", "price_source")
         return rows.drop(1).mapNotNull { row ->
             fun value(index: Int?): String = index?.let { row.getOrNull(it).orEmpty().trim() }.orEmpty()
             val ticker = value(tickerCol).uppercase(Locale.ROOT)
@@ -61,7 +61,7 @@ object ExcelImporter {
                 value(portfolioCol).ifBlank { "Ana Portföy" }, quantity, cost,
                 lastCol?.let { parseNumber(value(it)) },
                 value(currencyCol).ifBlank { if (normalizeCategory(value(categoryCol)) == "US_STOCK") "USD" else "TRY" }.uppercase(Locale.ROOT),
-                value(brokerCol).ifBlank { "Belirtilmedi" },
+                value(brokerCol).ifBlank { value(portfolioCol).ifBlank { "Belirtilmedi" } },
                 normalizePriceSource(value(sourceCol))
             )
         }.distinctBy { it.ticker }
