@@ -717,7 +717,7 @@ class MainActivity : AppCompatActivity() {
         })
         val chart = com.portfolio.app.ui.chart.PortfolioChartView(this).apply {
             this.type = type; this.values = values; this.labels = labels
-            centerValue = center; valueSuffix = suffix
+            centerValue = center; this.suffix = suffix
             layoutParams = LinearLayout.LayoutParams(-1, dp(height))
         }
         container.addView(chart)
