@@ -490,7 +490,7 @@ class MainActivity : AppCompatActivity() {
             opening + buys
         }
         val percent = if (pnl != null && capital != null && capital > 0.0) pnl / capital * 100.0 else null
-        binding.btnCurrencyToggle.text = if (displayCurrency == "TRY") "₺" else "$"
+        binding.btnCurrencyToggle.text = if (displayCurrency == "TRY") "₺" else "\$"
         binding.btnCurrencyToggle.contentDescription = if (displayCurrency == "TRY") "Dolar görünümüne geç" else "Türk lirası görünümüne geç"
         binding.tvTotalValue.text = marketValue?.let { currency(it, displayCurrency) } ?: "USD/TRY kuru bekleniyor"
         binding.tvTotalProfitLoss.text = pnl?.let { currency(it, displayCurrency) } ?: "USD/TRY kuru bekleniyor"
