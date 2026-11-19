@@ -201,34 +201,54 @@ class MainActivity : AppCompatActivity() {
     private fun importExcel(uri: Uri) {
         lifecycleScope.launch {
             try {
-                val rows = withContext(Dispatchers.IO) {
-                    contentResolver.openInputStream(uri)?.use { ExcelImporter.readHoldings(it) }
+                val backup = withContext(Dispatchers.IO) {
+                    contentResolver.openInputStream(uri)?.use { ExcelImporter.readPortfolio(it) }
                         ?: error("Excel dosyası açılamadı.")
                 }
-                if (rows.isEmpty()) {
-                    Toast.makeText(this@MainActivity, "İçe aktarılabilecek geçerli varlık bulunamadı.", Toast.LENGTH_LONG).show()
-                    return@launch
-                }
-                val preview = rows.take(12).joinToString("\n") {
-                    "${it.ticker} • ${formatNumber(it.quantity)} adet • ${currency(it.costPrice)} • ${it.broker}"
-                } + if (rows.size > 12) "\n… ve ${rows.size - 12} kayıt daha" else ""
+                val tradeCounts = backup.trades.groupingBy { it.action }.eachCount()
+                val preview = backup.assets.take(10).joinToString("\n") {
+                    "${it.ticker} • ${formatNumber(it.quantity)} adet • ${currency(it.costPerUnit, it.currency)}"
+                } + if (backup.assets.size > 10) "\n… ve ${backup.assets.size - 10} varlık daha" else ""
+                val transactionSummary = "Alış: ${tradeCounts["BUY"] ?: 0} • Satış: ${tradeCounts["SELL"] ?: 0} • Temettü: ${tradeCounts["DIVIDEND"] ?: 0}"
                 androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Excel içe aktarma önizlemesi")
-                    .setMessage("${rows.size} geçerli varlık bulundu. Mevcut semboller tekrar eklenmeyecek.\n\n$preview")
+                    .setTitle("Excel yedeği doğrulandı")
+                    .setMessage(
+                        "${backup.assets.size} varlık ve ${backup.trades.size} işlem bulundu.\n$transactionSummary\n\n" +
+                            "Örnek varlıklar:\n$preview\n\n" +
+                            "Birleştir: mevcut varlıkları korur, yalnızca yeni varlıkları ve bunların işlemlerini ekler.\n\n" +
+                            "Tamamen değiştir: mevcut portföy ve geçmiş kayıtlarını Excel yedeğiyle değiştirir."
+                    )
                     .setNegativeButton("Vazgeç", null)
-                    .setPositiveButton("İçe aktar") { _, _ ->
-                        viewModel.importHoldings(rows) { result ->
-                            runOnUiThread {
-                                result.onSuccess { (added, skipped) ->
-                                    Toast.makeText(this@MainActivity, "$added varlık eklendi, $skipped tekrar eden sembol atlandı.", Toast.LENGTH_LONG).show()
-                                }.onFailure {
-                                    Toast.makeText(this@MainActivity, "İçe aktarma başarısız: ${it.message}", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    }.show()
+                    .setNeutralButton("Birleştir") { _, _ -> runPortfolioRestore(backup, overwrite = false) }
+                    .setPositiveButton("Tamamen değiştir") { _, _ ->
+                        androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Mevcut portföy silinecek")
+                            .setMessage("Mevcut varlıklar, işlemler, temettüler ve grafik geçmişi silinerek Excel yedeği yüklenecek. Bu işlem geri alınamaz. Devam edilsin mi?")
+                            .setNegativeButton("İptal", null)
+                            .setPositiveButton("Evet, yedeği yükle") { _, _ -> runPortfolioRestore(backup, overwrite = true) }
+                            .show()
+                    }
+                    .show()
             } catch (error: Exception) {
                 Toast.makeText(this@MainActivity, "Excel okunamadı: ${error.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun runPortfolioRestore(backup: com.portfolio.app.data.importer.ImportedPortfolio, overwrite: Boolean) {
+        viewModel.restorePortfolio(backup, overwrite) { result ->
+            runOnUiThread {
+                result.onSuccess { summary ->
+                    val mode = if (overwrite) "Yedek geri yüklendi" else "Yedek birleştirildi"
+                    Toast.makeText(
+                        this@MainActivity,
+                        "$mode: ${summary.assetsAdded} varlık, ${summary.tradesAdded} işlem eklendi; " +
+                            "${summary.assetsSkipped} varlık ve ${summary.tradesSkipped} işlem atlandı.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }.onFailure { error ->
+                    Toast.makeText(this@MainActivity, "Geri yükleme başarısız; veritabanı değişmedi: ${error.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
