@@ -502,7 +502,7 @@ class MainActivity : AppCompatActivity() {
         val divUsd = currentDividends.filter { it.currency == "USD" && it.paymentDate >= todayStart }.sumOf { it.netAmount }
         val dailyTry = dailyPnlTry?.plus(divTry) ?: divTry.takeIf { it != 0.0 }
         val dailyUsd = dailyPnlUsd?.plus(divUsd) ?: divUsd.takeIf { it != 0.0 }
-        val daily = if (dailyTry == null && dailyUsd == null) null else {
+        val daily = if ((hasTry && dailyTry == null) || (hasUsd && dailyUsd == null) || (!hasTry && !hasUsd)) null else {
             val t = if (hasTry) convert(dailyTry ?: 0.0, "TRY") else 0.0
             val u = if (hasUsd) convert(dailyUsd ?: 0.0, "USD") else 0.0
             if ((hasTry && t == null) || (hasUsd && u == null)) null else (t ?: 0.0) + (u ?: 0.0)
