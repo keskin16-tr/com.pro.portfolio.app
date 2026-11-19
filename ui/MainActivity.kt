@@ -66,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private var currentDividends: List<DividendEntity> = emptyList()
     private var currentSnapshots: List<PortfolioSnapshotEntity> = emptyList()
     private var currentRates: List<MarketRate> = emptyList()
+    private var ratesSyncing: Boolean = false
     private var currentPriceSnapshots: List<AssetPriceSnapshotEntity> = emptyList()
     private var tradeSearchQuery = ""
     private var tradeActionFilter = "Tümü"
@@ -113,6 +114,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnTopManageAssets.setOnClickListener { showPage(NAV_ASSETS) }
         binding.btnTopManageTrades.setOnClickListener { showPage(NAV_TRADES) }
         binding.btnCurrencyToggle.setOnClickListener { selectedSummaryCurrency = if (selectedSummaryCurrency == "TRY") "USD" else "TRY"; updateSummary() }
+        binding.tvTopRatesStatus.setOnClickListener { viewModel.refreshRates() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -162,11 +164,19 @@ class MainActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.rates.collect { currentRates = it; updateSummary(); renderMarketRates() }
+                viewModel.rates.collect { currentRates = it; updateSummary(); renderMarketRates(); renderTopRates() }
             }
         }
     }
 
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.ratesSyncing.collect { syncing ->
+                    ratesSyncing = syncing
+                    renderTopRates()
+                }
+            }
+        }
     override fun onStart() {
         super.onStart()
         clockHandler.removeCallbacks(clockUpdate)
@@ -686,6 +696,71 @@ class MainActivity : AppCompatActivity() {
         })
         column.addView(actionButton("Varlığı düzenle", R.color.portfolio_blue) { showEditAssetDialog(asset) })
         card.addView(column); list.addView(card)
+    }
+
+
+    private fun renderTopRates() {
+        val rows = listOf(binding.topRatesRowOne, binding.topRatesRowTwo)
+        rows.forEach { it.removeAllViews() }
+        val definitions = listOf("Dolar / TL", "Euro / TL", "Gram Altın", "Gram Gümüş")
+        val latestTime = currentRates.maxOfOrNull { it.updatedAt }
+        val timeText = latestTime?.let {
+            SimpleDateFormat("HH:mm", Locale("tr", "TR")).format(Date(it))
+        } ?: "Henüz veri yok"
+        binding.tvTopRatesStatus.text = when {
+            ratesSyncing && latestTime != null -> "⟳ Güncelleniyor • Son: $timeText"
+            ratesSyncing -> "⟳ Kurlar alınıyor..."
+            latestTime != null -> "Son: $timeText • Yenile"
+            else -> "Kur verisi bekleniyor • Yenile"
+        }
+        binding.tvTopRatesStatus.setTextColor(ContextCompat.getColor(
+            this, if (ratesSyncing) R.color.portfolio_blue else R.color.portfolio_muted
+        ))
+
+        definitions.forEachIndexed { index, title ->
+            val rate = currentRates.firstOrNull { it.title.equals(title, true) }
+            val card = com.google.android.material.card.MaterialCardView(this).apply {
+                radius = dp(15).toFloat()
+                setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+                setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue)))
+                strokeWidth = dp(1)
+                cardElevation = 0f
+                layoutParams = LinearLayout.LayoutParams(0, dp(102), 1f).apply {
+                    if (index % 2 == 0) marginEnd = dp(5) else marginStart = dp(5)
+                    if (index >= 2) topMargin = dp(8)
+                }
+            }
+            val column = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), dp(10), dp(10), dp(8))
+            }
+            column.addView(TextView(this).apply {
+                text = when (index) { 0 -> "USD/TRY"; 1 -> "EUR/TRY"; 2 -> "ALTIN (GR)"; else -> "GÜMÜŞ (GR)" }
+                textSize = 11f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            })
+            column.addView(TextView(this).apply {
+                text = rate?.let { currency(it.value, it.currency) } ?: "—"
+                textSize = 19f
+                typeface = Typeface.DEFAULT_BOLD
+                fontFeatureSettings = "tnum"
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+                setPadding(0, dp(5), 0, dp(2))
+            })
+            val change = rate?.dailyChangePercent
+            column.addView(TextView(this).apply {
+                text = change?.let { String.format(Locale("tr", "TR"), "%+.2f%%", it) } ?: "Günlük değişim —"
+                textSize = 11f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(
+                    this@MainActivity,
+                    if ((change ?: 0.0) < 0.0) R.color.portfolio_orange else R.color.portfolio_green
+                ))
+            })
+            card.addView(column)
+            rows[index / 2].addView(card)
+        }
     }
 
     private fun renderMarketRates() {
