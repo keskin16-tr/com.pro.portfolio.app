@@ -3,7 +3,7 @@ on:
   push:
     branches: [main, portfolio-pro-3.0, portfolio-pro-3.1, portfolio-pro-3.2, portfolio-pro-3.3, portfolio-pro-3.4, portfolio-pro-3.5, portfolio-pro-3.6, portfolio-pro-3.7, portfolio-pro-3.8, portfolio-pro-3.9, portfolio-pro-4.0]
   pull_request:
-    branches: [main]
+    branches: [main, portfolio-pro-3.9, portfolio-pro-4.0]
   workflow_dispatch:
 permissions:
   contents: read
