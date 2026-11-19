@@ -273,6 +273,34 @@ class MainActivity : AppCompatActivity() {
                 content.addView(actionButton("Satış yap", R.color.portfolio_orange) { showSellDialog() })
                 content.addView(actionButton("Temettü ekle", R.color.portfolio_purple) { showDividendDialog() })
             }
+            if (id == NAV_TRADES) {
+                val search = android.widget.EditText(this).apply {
+                    hint = "Sembol, varlık adı veya not ara"; setSingleLine(true)
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+                    setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
+                    addTextChangedListener(object : android.text.TextWatcher {
+                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { tradeSearchQuery = s?.toString().orEmpty(); renderTradeManagement() }
+                        override fun afterTextChanged(s: android.text.Editable?) = Unit
+                    })
+                }
+                content.addView(search)
+                val filters = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                fun addFilter(items: List<String>, onSelect: (String) -> Unit) {
+                    val spinner = android.widget.Spinner(this@MainActivity).apply {
+                        adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items)
+                        onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+                            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) { onSelect(items[position]); renderTradeManagement() }
+                        }
+                    }
+                    filters.addView(spinner, LinearLayout.LayoutParams(0, dp(48), 1f))
+                }
+                addFilter(listOf("Tümü", "Alış", "Satış", "Temettü")) { tradeActionFilter = it }
+                addFilter(listOf("Tümü", "TRY", "USD")) { tradeCurrencyFilter = it }
+                content.addView(filters)
+            }
             if (id == NAV_ASSETS || id == NAV_TRADES || id == NAV_BIST || id == NAV_CRYPTO) {
                 val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 content.addView(list)
@@ -899,7 +927,19 @@ class MainActivity : AppCompatActivity() {
         }
         val assets = currentAssets.associateBy { it.id }
         val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
-        currentTrades.forEach { trade ->
+        val filteredTrades = currentTrades.filter { trade ->
+            val asset = assets[trade.assetId]
+            val symbol = asset?.ticker ?: "Varlık #${trade.assetId}"
+            val actionLabel = when (trade.action) { "BUY" -> "Alış"; "SELL" -> "Satış"; "DIVIDEND" -> "Temettü"; else -> trade.action }
+            val matchesAction = tradeActionFilter == "Tümü" || actionLabel == tradeActionFilter
+            val matchesCurrency = tradeCurrencyFilter == "Tümü" || trade.currency.equals(tradeCurrencyFilter, true)
+            val query = tradeSearchQuery.trim()
+            val matchesQuery = query.isBlank() || symbol.contains(query, true) || asset?.name.orEmpty().contains(query, true) || trade.note.contains(query, true)
+            matchesAction && matchesCurrency && matchesQuery
+        }
+        if (filteredTrades.isEmpty()) list.addView(TextView(this).apply { text = "Seçili filtrelerle eşleşen işlem bulunamadı."; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(12), 0, dp(12)) })
+        filteredTrades.forEach { trade ->
+        filteredTrades.forEach { trade ->
             val symbol = assets[trade.assetId]?.ticker ?: "Varlık #${trade.assetId}"
             val card = com.google.android.material.card.MaterialCardView(this).apply {
                 radius = dp(16).toFloat(); setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
