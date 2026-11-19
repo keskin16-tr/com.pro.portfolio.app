@@ -17,7 +17,7 @@ data class ImportedAsset(
 data class ImportedTrade(
     val sourceId: Long?, val sourceAssetId: Long?, val ticker: String,
     val action: String, val quantity: Double, val unitPrice: Double, val fee: Double,
-    val currency: String, val executedAt: Long, val note: String, val realizedProfit: Double?
+    val currency: String, val executedAt: Long, val note: String, val realizedProfit: Double?, val applied: Boolean
 )
 data class ImportedPortfolio(val assets: List<ImportedAsset>, val trades: List<ImportedTrade>)
 
@@ -103,6 +103,7 @@ object ExcelImporter {
         val idCol = col("id", "işlem id")
         val feeCol = col("fee", "commission", "komisyon", "komisyon / stopaj", "stopaj")
         val realizedCol = col("realized_pnl", "realized pnl", "gerçekleşen k/z", "realizedprofit")
+        val appliedCol = col("applied", "uygulandı", "aktif")
         return rows.drop(1).mapNotNull { row ->
             fun v(i: Int?) = i?.let { row.getOrNull(it).orEmpty().trim() }.orEmpty()
             val action = when (normalize(v(actionCol))) {
@@ -117,7 +118,7 @@ object ExcelImporter {
             val ticker = v(tickerCol).uppercase(Locale.ROOT).ifBlank { v(assetNameCol).uppercase(Locale.ROOT) }
             ImportedTrade(v(idCol).toLongOrNull(), v(assetIdCol).toLongOrNull(), ticker, action,
                 qty, price, number(v(feeCol)) ?: 0.0, v(currencyCol).ifBlank { "TRY" }.uppercase(Locale.ROOT),
-                date, v(noteCol), number(v(realizedCol)))
+                date, v(noteCol), number(v(realizedCol)), v(appliedCol).let { it.isBlank() || normalize(it) in setOf("TRUE", "1", "YES", "EVET", "UYGULANDI") })
         }
     }
 
@@ -211,7 +212,7 @@ object ExcelImporter {
         val s = raw.trim()
         s.toLongOrNull()?.let { return when { it > 10_000_000_000L -> it; it > 0 -> it * 1000L; else -> null } }
         number(s)?.let { serial ->
-            if (serial in 1.0..100000.0) return 25569L.let { (serial - it).toLong() * 86_400_000L + 0L }
+            if (serial in 1.0..100000.0) return ((serial - 25569.0) * 86_400_000.0).toLong()
         }
         val patterns = listOf("yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd", "dd.MM.yyyy HH:mm:ss", "dd.MM.yyyy", "MM/dd/yyyy")
         patterns.forEach { pattern -> runCatching { SimpleDateFormat(pattern, Locale.US).apply { isLenient = false }.parse(s)?.time }.getOrNull()?.let { return it } }
