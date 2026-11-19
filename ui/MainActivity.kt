@@ -673,14 +673,6 @@ class MainActivity : AppCompatActivity() {
                     com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.LINE, history.map { it.price }, labels)
             }
         }
-        active.sortedByDescending { it.quantity * (it.lastPrice ?: it.costPrice) }.take(8).forEach { asset ->
-            val history = currentPriceSnapshots.filter { it.assetId == asset.id }.sortedBy { it.snapshotDate }.takeLast(30)
-            if (history.size >= 2) {
-                val labels = history.map { SimpleDateFormat("dd.MM", Locale("tr", "TR")).format(Date(it.snapshotDate)) }
-                addChart(asset.ticker + " fiyat geçmişi", "Son " + history.size + " kayıt • " + asset.currency,
-                    com.portfolio.app.ui.chart.AnalyticsChartView.ChartType.LINE, history.map { it.price }, labels)
-            }
-        }
         container.addView(TextView(this).apply {
             text = "Günlük kâr/zarar, bir önceki güne ait kaydedilmiş varlık fiyatlarıyla karşılaştırılır. Bu özellik 4.0 sürümünden itibaren fiyat geçmişi biriktirir; ilk karşılaştırma için en az iki farklı gün fiyat kaydı gerekir."
             textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(16), 0, dp(24))
