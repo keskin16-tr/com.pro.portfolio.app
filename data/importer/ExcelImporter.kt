@@ -122,8 +122,8 @@ object ExcelImporter {
             val action = when (normalize(v(actionCol))) {
                 "BUY", "ALIS", "AL" -> "BUY"
                 "SELL", "SATIS", "SAT" -> "SELL"
-                "CASH IN", "PARA GIRISI", "PARA YATIRMA", "DEPOSIT" -> "CASH_IN"
-                "CASH OUT", "PARA CIKISI", "PARA CEKME", "WITHDRAWAL" -> "CASH_OUT"
+                "CASHIN", "PARAGIRISI", "PARAYATIRMA", "DEPOSIT" -> "CASH_IN"
+                "CASHOUT", "PARACIKISI", "PARACEKME", "WITHDRAWAL" -> "CASH_OUT"
                 "TRANSFER", "HAVALE", "VIRMAN" -> "TRANSFER"
                 "DIVIDEND", "TEMETTU" -> "DIVIDEND"
                 else -> return@mapNotNull null
