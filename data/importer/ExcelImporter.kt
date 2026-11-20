@@ -12,7 +12,8 @@ data class ImportedAsset(
     val sourceId: Long?, val ticker: String, val name: String, val category: String,
     val portfolioName: String, val quantity: Double, val unitPrice: Double?,
     val currency: String, val costPerUnit: Double, val broker: String,
-    val priceSource: String, val marketSymbol: String
+    val priceSource: String, val marketSymbol: String,
+    val notes: String, val createdAt: Long?, val updatedAt: Long?
 )
 // Backward-compatible model used by the legacy single-sheet import flow.
 data class ImportedHolding(
@@ -30,7 +31,8 @@ data class ImportedHolding(
 data class ImportedTrade(
     val sourceId: Long?, val sourceAssetId: Long?, val ticker: String,
     val action: String, val quantity: Double, val unitPrice: Double, val fee: Double,
-    val currency: String, val executedAt: Long, val note: String, val realizedProfit: Double?, val applied: Boolean
+    val currency: String, val executedAt: Long, val note: String, val realizedProfit: Double?,
+    val applied: Boolean, val createdAt: Long?, val realizedProfitTry: Double?
 )
 data class ImportedPortfolio(val assets: List<ImportedAsset>, val trades: List<ImportedTrade>)
 
@@ -84,6 +86,9 @@ object ExcelImporter {
         val brokerCol = col("broker", "aracı kurum", "kurum")
         val sourceCol = col("price_source", "price source", "fiyat kaynağı")
         val marketCol = col("market_symbol", "market symbol")
+        val notesCol = col("notes", "note", "not", "açıklama")
+        val createdCol = col("created_at", "created at", "oluşturulma tarihi")
+        val updatedCol = col("updated_at", "updated at", "güncelleme tarihi")
         return rows.drop(1).mapNotNull { row ->
             fun v(i: Int?) = i?.let { row.getOrNull(it).orEmpty().trim() }.orEmpty()
             val marketSymbol = v(marketCol)
@@ -97,7 +102,8 @@ object ExcelImporter {
                 ImportedAsset(v(idCol).toLongOrNull(), ticker, v(nameCol).ifBlank { ticker },
                     category, account, qty, number(v(unitCol)), v(currencyCol).ifBlank { if (category == "US_STOCK") "USD" else "TRY" }.uppercase(Locale.ROOT),
                     cost, v(brokerCol).ifBlank { account }, priceSource(v(sourceCol)),
-                    marketSymbol.ifBlank { defaultMarketSymbol(ticker, category) })
+                    marketSymbol.ifBlank { defaultMarketSymbol(ticker, category) },
+                    v(notesCol), parseDate(v(createdCol)), parseDate(v(updatedCol)))
             }
         }
     }
@@ -119,6 +125,8 @@ object ExcelImporter {
         val feeCol = col("fee", "commission", "komisyon", "komisyon / stopaj", "stopaj")
         val realizedCol = col("realized_pnl", "realized pnl", "gerçekleşen k/z", "realizedprofit")
         val appliedCol = col("applied", "uygulandı", "aktif")
+        val createdCol = col("created_at", "created at", "oluşturulma tarihi")
+        val realizedTryCol = col("realized_pnl_try", "realized pnl try", "gerçekleşen k/z try")
         return rows.drop(1).mapNotNull { row ->
             fun v(i: Int?) = i?.let { row.getOrNull(it).orEmpty().trim() }.orEmpty()
             val action = when (normalize(v(actionCol))) {
@@ -141,7 +149,8 @@ object ExcelImporter {
             }.uppercase(Locale.ROOT)
             ImportedTrade(v(idCol).toLongOrNull(), v(assetIdCol).toLongOrNull(), ticker, action,
                 rawQty, rawPrice, number(v(feeCol)) ?: 0.0, v(currencyCol).ifBlank { "TRY" }.uppercase(Locale.ROOT),
-                date, note, number(v(realizedCol)), v(appliedCol).let { it.isBlank() || normalize(it) in setOf("TRUE", "1", "YES", "EVET", "UYGULANDI") })
+                date, note, number(v(realizedCol)), v(appliedCol).let { it.isBlank() || normalize(it) in setOf("TRUE", "1", "YES", "EVET", "UYGULANDI") },
+                parseDate(v(createdCol)), number(v(realizedTryCol)))
         }
     }
 
