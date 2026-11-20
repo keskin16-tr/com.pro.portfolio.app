@@ -1166,7 +1166,7 @@ class MainActivity : AppCompatActivity() {
             selectableAssets = items
             assetSpinner.adapter = android.widget.ArrayAdapter(
                 this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
-                items.map { "${it.ticker} — ${it.name} (${it.currency})" }
+                items.map { "${it.ticker} — ${it.name} (${it.currency} • ${it.broker})" }
             )
         }
         refreshAssets(currentAssets)
