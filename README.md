@@ -113,7 +113,7 @@ Excel dışa aktarma da aynı iki sayfa adını ve sütun düzenini kullanır: `
 
 ### Geri yükleme seçenekleri
 
-- **Birleştir:** Mevcut portföy korunur. Aynı sembol/para birimi/hesap eşleşen varlıklar tekrar eklenmez; yeni varlıklar ve mükerrer olmayan geçmiş işlemler aktarılır. `applied=0` kayıtları geçmiş olarak eklenir, `applied=1` işlemler mevcut varlık bakiyesine ikinci kez uygulanmaz.
+- **Birleştir:** Mevcut portföy korunur. Aynı sembol/para birimi/hesap eşleşen varlıklar tekrar eklenmez; mükerrer olmayan işlem geçmişi aktarılır. Mevcut varlıklara ait içe aktarılan işlemler `applied=0` geçmiş kaydı olarak saklanır ve mevcut bakiyeye yeniden uygulanmaz. Yeni eklenen varlıklara ait işlemlerde kaynak dosyanın `applied` değeri korunur.
 - **Tamamen değiştir:** Mevcut portföy verileri temizlenerek seçilen yedekteki varlıklar ve işlemler geri yüklenir. Bu seçeneği kullanmadan önce mevcut verilerin yedeğini alın.
 
 > Önemli: Excel dosyanızın sütun adları ve veri biçimleri farklıysa içe aktarma öncesinde dosyanın bir kopyasını kullanarak test edin. Tamamen değiştir seçeneği mevcut portföy kayıtlarını siler.
