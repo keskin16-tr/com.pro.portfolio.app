@@ -85,7 +85,7 @@ class PortfolioRepository(private val database: AppDatabase) {
         require(amount > 0.0 && amount.isFinite()) { "Tutar sıfırdan büyük olmalı." }
         database.withTransaction {
             val asset = assetDao.getById(assetId) ?: error("Nakit varlığı bulunamadı")
-            require(asset.category.equals("CASH", true) || asset.ticker.uppercase() in setOf("TRY", "USD")) {
+            require(asset.category.uppercase() in setOf("CASH", "BANK") || asset.ticker.uppercase() in setOf("TRY", "USD")) {
                 "Para girişi/çıkışı için Nakit kategorisindeki varlığı seçin."
             }
             tradeDao.insert(TradeEntity(
