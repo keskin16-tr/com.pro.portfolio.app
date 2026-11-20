@@ -86,7 +86,9 @@ object ExcelImporter {
         val marketCol = col("market_symbol", "market symbol")
         return rows.drop(1).mapNotNull { row ->
             fun v(i: Int?) = i?.let { row.getOrNull(it).orEmpty().trim() }.orEmpty()
-            val ticker = v(tickerCol).ifBlank { v(nameCol) }.uppercase(Locale.ROOT)
+            val marketSymbol = v(marketCol)
+            val fallbackSymbol = marketSymbol.takeIf { it.any { ch -> ch.isLetterOrDigit() } }.orEmpty()
+            val ticker = v(tickerCol).ifBlank { fallbackSymbol }.ifBlank { v(nameCol) }.uppercase(Locale.ROOT)
             val qty = number(v(qtyCol)); val cost = number(v(costCol))
             if (ticker.isBlank() || qty == null || qty < 0.0 || cost == null || cost < 0.0) null
             else {
@@ -95,9 +97,9 @@ object ExcelImporter {
                 ImportedAsset(v(idCol).toLongOrNull(), ticker, v(nameCol).ifBlank { ticker },
                     category, account, qty, number(v(unitCol)), v(currencyCol).ifBlank { if (category == "US_STOCK") "USD" else "TRY" }.uppercase(Locale.ROOT),
                     cost, v(brokerCol).ifBlank { account }, priceSource(v(sourceCol)),
-                    v(marketCol).ifBlank { defaultMarketSymbol(ticker, category) })
+                    marketSymbol.ifBlank { defaultMarketSymbol(ticker, category) })
             }
-        }.distinctBy { it.ticker + "|" + it.currency }
+        }
     }
 
     private fun parseTrades(rows: List<List<String>>): List<ImportedTrade> {
