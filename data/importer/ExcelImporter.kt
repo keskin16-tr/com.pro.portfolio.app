@@ -134,7 +134,9 @@ object ExcelImporter {
             // Temettüde quantity × unit_price toplam temettü tutarını verir.
             val date = parseDate(v(dateCol)) ?: System.currentTimeMillis()
             val note = v(noteCol)
-            val ticker = v(tickerCol).ifBlank { note }.ifBlank { v(assetNameCol) }.uppercase(Locale.ROOT)
+            val ticker = v(tickerCol).ifBlank {
+                if (action == "DIVIDEND" && v(assetIdCol).isBlank()) note else v(assetNameCol)
+            }.uppercase(Locale.ROOT)
             ImportedTrade(v(idCol).toLongOrNull(), v(assetIdCol).toLongOrNull(), ticker, action,
                 rawQty, rawPrice, number(v(feeCol)) ?: 0.0, v(currencyCol).ifBlank { "TRY" }.uppercase(Locale.ROOT),
                 date, note, number(v(realizedCol)), v(appliedCol).let { it.isBlank() || normalize(it) in setOf("TRUE", "1", "YES", "EVET", "UYGULANDI") })
