@@ -31,7 +31,8 @@ class PortfolioRepository(private val database: AppDatabase) {
     suspend fun recordBuy(
         name: String, ticker: String, quantity: Double, unitPrice: Double,
         category: String = "OTHER", currency: String = "TRY", fee: Double = 0.0,
-        broker: String = "Belirtilmedi", priceSource: String = "AUTO", manualPrice: Double? = null
+        broker: String = "Belirtilmedi", priceSource: String = "AUTO", manualPrice: Double? = null,
+        note: String = "Alış işlemi"
     ) {
         require(currency.uppercase() in listOf("TRY", "USD")) { "Varlık para birimi yalnızca TRY veya USD olabilir." }
         if (priceSource == "MANUAL") require(manualPrice != null && manualPrice >= 0.0) { "Elle giriş için güncel fiyat girin." }
@@ -53,13 +54,13 @@ class PortfolioRepository(private val database: AppDatabase) {
             val averageCost = (current.quantity * current.costPrice + quantity * unitPrice + fee) / newQuantity
             tradeDao.insert(TradeEntity(
                 assetId = assetId, action = "BUY", quantity = quantity, unitPrice = unitPrice,
-                fee = fee, note = "Alış işlemi", currency = currency
+                fee = fee, note = note, currency = currency
             ))
             assetDao.updatePosition(assetId, newQuantity, averageCost)
         }
     }
 
-    suspend fun recordSell(assetId: Long, quantity: Double, unitPrice: Double, fee: Double = 0.0) {
+    suspend fun recordSell(assetId: Long, quantity: Double, unitPrice: Double, fee: Double = 0.0, note: String = "Satış işlemi") {
         require(quantity > 0.0 && unitPrice >= 0.0 && fee >= 0.0)
         database.withTransaction {
             val asset = assetDao.getById(assetId) ?: error("Varlık bulunamadı")
@@ -67,9 +68,43 @@ class PortfolioRepository(private val database: AppDatabase) {
             val realized = (unitPrice - asset.costPrice) * quantity - fee
             tradeDao.insert(TradeEntity(
                 assetId = assetId, action = "SELL", quantity = quantity, unitPrice = unitPrice,
-                fee = fee, realizedProfit = realized, note = "Satış işlemi", currency = asset.currency
+                fee = fee, realizedProfit = realized, note = note, currency = asset.currency
             ))
             assetDao.updatePosition(assetId, asset.quantity - quantity, asset.costPrice)
+        }
+    }
+
+    suspend fun recordCashFlow(assetId: Long, action: String, amount: Double, note: String = "") {
+        require(action == "CASH_IN" || action == "CASH_OUT") { "Geçersiz para hareketi." }
+        require(amount > 0.0 && amount.isFinite()) { "Tutar sıfırdan büyük olmalı." }
+        database.withTransaction {
+            val asset = assetDao.getById(assetId) ?: error("Nakit varlığı bulunamadı")
+            require(asset.category.equals("CASH", true) || asset.ticker.uppercase() in setOf("TRY", "USD")) {
+                "Para girişi/çıkışı için Nakit kategorisindeki varlığı seçin."
+            }
+            tradeDao.insert(TradeEntity(
+                assetId = assetId, action = action, quantity = amount, unitPrice = 1.0,
+                fee = 0.0, note = note.ifBlank { if (action == "CASH_IN") "Para girişi" else "Para çıkışı" },
+                currency = asset.currency
+            ))
+            recalculateAsset(assetId)
+        }
+    }
+
+    suspend fun recordTransfer(assetId: Long, destinationAccount: String, note: String = "") {
+        require(destinationAccount.isNotBlank()) { "Hedef hesap/kurum girin." }
+        database.withTransaction {
+            val asset = assetDao.getById(assetId) ?: error("Varlık bulunamadı")
+            val sourceAccount = asset.broker.ifBlank { "Belirtilmedi" }
+            require(!sourceAccount.equals(destinationAccount.trim(), true)) { "Kaynak ve hedef hesap aynı olamaz." }
+            val description = listOf("Hesap transferi: $sourceAccount → ${destinationAccount.trim()}", note.trim())
+                .filter { it.isNotBlank() }.joinToString(" • ")
+            tradeDao.insert(TradeEntity(
+                assetId = assetId, action = "TRANSFER", quantity = asset.quantity,
+                unitPrice = asset.lastPrice ?: asset.costPrice, fee = 0.0,
+                note = description, currency = asset.currency
+            ))
+            assetDao.updateClassification(assetId, asset.category, destinationAccount.trim())
         }
     }
 
@@ -167,13 +202,14 @@ class PortfolioRepository(private val database: AppDatabase) {
                         (trade.sourceAssetId == null && trade.ticker.equals(item.ticker, true)))
                 }.sortedBy { it.executedAt }
                 val openingQuantity = if (related.isEmpty()) item.quantity else
-                    item.quantity - related.filter { it.action == "BUY" }.sumOf { it.quantity } +
-                        related.filter { it.action == "SELL" }.sumOf { it.quantity }
+                    item.quantity -
+                        related.filter { it.action in setOf("BUY", "CASH_IN") }.sumOf { it.quantity } +
+                        related.filter { it.action in setOf("SELL", "CASH_OUT") }.sumOf { it.quantity }
                 require(openingQuantity >= -1e-8) {
                     "${item.ticker}: işlem geçmişi mevcut miktarla uyuşmuyor. Yedek dosyayı kontrol edin."
                 }
                 val openingQty = openingQuantity.coerceAtLeast(0.0)
-                val buyCost = related.filter { it.action == "BUY" }.sumOf { it.quantity * it.unitPrice + it.fee }
+                val buyCost = related.filter { it.action in setOf("BUY", "CASH_IN") }.sumOf { it.quantity * it.unitPrice + it.fee }
                 val openingCost = if (openingQty > 1e-8) {
                     ((item.costPerUnit * item.quantity - buyCost) / openingQty).coerceAtLeast(0.0)
                 } else 0.0
@@ -279,7 +315,7 @@ class PortfolioRepository(private val database: AppDatabase) {
         tradeId: Long, action: String, quantity: Double, unitPrice: Double,
         fee: Double, note: String, executedAt: Long
     ) {
-        require(action == "BUY" || action == "SELL" || action == "DIVIDEND")
+        require(action in setOf("BUY", "SELL", "CASH_IN", "CASH_OUT", "TRANSFER", "DIVIDEND"))
         require(quantity > 0.0 && unitPrice >= 0.0 && fee >= 0.0)
         database.withTransaction {
             val current = tradeDao.getById(tradeId) ?: error("İşlem bulunamadı")
@@ -310,7 +346,7 @@ class PortfolioRepository(private val database: AppDatabase) {
             val trade = tradeDao.getById(tradeId) ?: return@withTransaction
             dividendDao.getByTradeId(tradeId)?.let { dividendDao.delete(it) }
             tradeDao.delete(trade)
-            if (trade.action != "DIVIDEND") recalculateAsset(trade.assetId)
+            if (trade.action !in setOf("DIVIDEND", "TRANSFER")) recalculateAsset(trade.assetId)
         }
     }
 
@@ -319,21 +355,25 @@ class PortfolioRepository(private val database: AppDatabase) {
         var quantity = asset.openingQuantity
         var averageCost = asset.openingCostPrice
         tradeDao.getForAssetOnce(assetId).filter { it.applied && it.action != "DIVIDEND" }.forEach { trade ->
-            if (trade.action == "BUY") {
-                val nextQuantity = quantity + trade.quantity
-                averageCost = if (nextQuantity > 0.0) {
-                    (quantity * averageCost + trade.quantity * trade.unitPrice + trade.fee) / nextQuantity
-                } else 0.0
-                quantity = nextQuantity
-                if (trade.realizedProfit != 0.0) tradeDao.update(trade.copy(realizedProfit = 0.0))
-            } else {
-                require(trade.quantity <= quantity + 1e-8) {
-                    "Bu işlem düzenlemesi, önceki alışlardan fazla satış oluşturuyor. İşlem geri alındı."
+            when (trade.action) {
+                "BUY", "CASH_IN" -> {
+                    val nextQuantity = quantity + trade.quantity
+                    averageCost = if (nextQuantity > 0.0) {
+                        (quantity * averageCost + trade.quantity * trade.unitPrice + trade.fee) / nextQuantity
+                    } else 0.0
+                    quantity = nextQuantity
+                    if (trade.realizedProfit != 0.0) tradeDao.update(trade.copy(realizedProfit = 0.0))
                 }
-                val realized = (trade.unitPrice - averageCost) * trade.quantity - trade.fee
-                quantity = (quantity - trade.quantity).coerceAtLeast(0.0)
-                tradeDao.update(trade.copy(realizedProfit = realized))
-                if (quantity == 0.0) averageCost = 0.0
+                "SELL", "CASH_OUT" -> {
+                    require(trade.quantity <= quantity + 1e-8) {
+                        "Bu işlem düzenlemesi, önceki bakiyeden fazla çıkış oluşturuyor. İşlem geri alındı."
+                    }
+                    val realized = if (trade.action == "SELL") (trade.unitPrice - averageCost) * trade.quantity - trade.fee else 0.0
+                    quantity = (quantity - trade.quantity).coerceAtLeast(0.0)
+                    tradeDao.update(trade.copy(realizedProfit = realized))
+                    if (quantity == 0.0) averageCost = 0.0
+                }
+                "TRANSFER" -> Unit
             }
         }
         assetDao.updatePosition(assetId, quantity, averageCost)
