@@ -11,5 +11,8 @@ data class AssetEntity(
  @ColumnInfo(defaultValue="'Belirtilmedi'") val broker:String="Belirtilmedi",
  @ColumnInfo(defaultValue="0.0") val openingQuantity:Double=0.0,
  @ColumnInfo(defaultValue="0.0") val openingCostPrice:Double=0.0,
- @ColumnInfo(defaultValue="'AUTO'") val priceSource:String="AUTO"
+ @ColumnInfo(defaultValue="'AUTO'") val priceSource:String="AUTO",
+ @ColumnInfo(defaultValue="''") val notes:String="",
+ val createdAt:Long?=null,
+ val updatedAt:Long?=null
 )
