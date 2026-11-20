@@ -261,20 +261,22 @@ class PortfolioRepository(private val database: AppDatabase) {
                     } ?: return@forEach
                 val key = fingerprint(asset.id, item.action, item.quantity, item.unitPrice, item.fee, item.executedAt, item.currency, item.note)
                 val isNewAssetInThisRestore = acceptedAssets.values.any { it.first == asset.id }
-                if (!overwrite && (key in existingFingerprints || (!isNewAssetInThisRestore && item.applied))) {
+                if (!overwrite && key in existingFingerprints) {
                     skippedTrades++
                     return@forEach
                 }
                 if (!importedFingerprints.add(key)) { skippedTrades++; return@forEach }
+                // A merge keeps an existing position untouched; its imported rows become history-only.
+                val applyToBalance = item.applied && (overwrite || isNewAssetInThisRestore)
                 val tradeId = tradeDao.insert(TradeEntity(
                     id = if (overwrite) item.sourceId?.takeIf { it > 0L } ?: 0L else 0L,
                     assetId = asset.id, action = item.action, quantity = item.quantity,
                     unitPrice = item.unitPrice, fee = item.fee, realizedProfit = item.realizedProfit ?: 0.0,
-                    executedAt = item.executedAt, note = item.note, currency = item.currency, applied = item.applied,
+                    executedAt = item.executedAt, note = item.note, currency = item.currency, applied = applyToBalance,
                     createdAt = item.createdAt,
                     realizedProfitTry = item.realizedProfitTry ?: if (item.currency == "TRY") (item.realizedProfit ?: 0.0) else 0.0
                 ))
-                if (item.action == "DIVIDEND" && item.applied) {
+                if (item.action == "DIVIDEND" && applyToBalance) {
                     dividendDao.insert(DividendEntity(
                         assetId = asset.id, ticker = asset.ticker, quantityAtPayment = asset.quantity,
                         grossAmount = item.quantity * item.unitPrice, withholdingTax = item.fee,
