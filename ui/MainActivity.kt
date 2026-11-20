@@ -1076,6 +1076,7 @@ class MainActivity : AppCompatActivity() {
         "GOLD" -> "Altın"
         "COMMODITY" -> "Emtia"
         "BOND" -> "Tahvil / Bono"
+        "BANK" -> "Banka"
         "CASH" -> "Nakit"
         else -> "Diğer"
     }
@@ -1100,8 +1101,8 @@ class MainActivity : AppCompatActivity() {
             this, android.R.layout.simple_spinner_dropdown_item,
             currentAssets.map { "${it.ticker} — ${it.name}" }
         )
-        val categoryCodes = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
-        val categoryLabels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto Para", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Nakit", "Diğer")
+        val categoryCodes = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "BANK", "CASH", "OTHER")
+        val categoryLabels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto Para", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Banka", "Nakit", "Diğer")
         val categorySpinner = android.widget.Spinner(this)
         categorySpinner.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, categoryLabels)
         val brokerNames = listOf("Belirtilmedi", "İş Yatırım", "Garanti BBVA Yatırım", "Yapı Kredi Yatırım", "Ak Yatırım", "Ziraat Yatırım", "QNB Invest", "Midas", "PhillipCapital", "A1 Capital", "Diğer")
@@ -1207,7 +1208,7 @@ class MainActivity : AppCompatActivity() {
             val action = actionCodes[typeSpinner.selectedItemPosition.coerceIn(0, actionCodes.lastIndex)]
             val cashAction = action == "CASH_IN" || action == "CASH_OUT"
             val eligible = if (cashAction) currentAssets.filter {
-                it.category.equals("CASH", true) || it.ticker.equals("TRY", true) || it.ticker.equals("USD", true)
+                it.category.equals("CASH", true) || it.category.equals("BANK", true) || it.ticker.equals("TRY", true) || it.ticker.equals("USD", true)
             } else currentAssets
             refreshAssets(eligible.ifEmpty { currentAssets })
             quantity.visibility = if (action == "TRANSFER") View.GONE else View.VISIBLE
@@ -1418,8 +1419,8 @@ class MainActivity : AppCompatActivity() {
         fun field(hint: String, value: String) = android.widget.EditText(this).apply { this.hint = hint; setText(value); isSingleLine = true }
         val name = field("Varlık adı", asset.name)
         val ticker = field("Sembol", asset.ticker)
-        val categories = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
-        val labels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Nakit", "Diğer")
+        val categories = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "BANK", "CASH", "OTHER")
+        val labels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Banka", "Nakit", "Diğer")
         val category = android.widget.Spinner(this).apply { adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels); setSelection(categories.indexOf(asset.category).coerceAtLeast(0)) }
         val broker = field("Aracı kurum", asset.broker)
         val currencyCodes = listOf("TRY", "USD")
