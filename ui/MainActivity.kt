@@ -1294,7 +1294,7 @@ class MainActivity : AppCompatActivity() {
                         if (gross == null || gross <= 0.0 || commission !in 0.0..100.0) {
                             Toast.makeText(this, "Pozitif brüt temettü ve %0–100 stopaj oranı girin.", Toast.LENGTH_LONG).show()
                         } else {
-                            viewModel.addDividend(asset.ticker, gross, commission, asset.currency, memo)
+                            viewModel.addDividend(asset.ticker, gross, commission, asset.currency, memo, asset.broker)
                             Toast.makeText(this, "Temettü işlemi kaydediliyor.", Toast.LENGTH_SHORT).show()
                         }
                     }
