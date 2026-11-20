@@ -72,7 +72,9 @@ class PortfolioRepository(private val database: AppDatabase) {
             val realized = (unitPrice - asset.costPrice) * quantity - fee
             tradeDao.insert(TradeEntity(
                 assetId = assetId, action = "SELL", quantity = quantity, unitPrice = unitPrice,
-                fee = fee, realizedProfit = realized, note = note, currency = asset.currency
+                fee = fee, realizedProfit = realized,
+                realizedProfitTry = if (asset.currency == "TRY") realized else 0.0,
+                note = note, currency = asset.currency
             ))
             assetDao.updatePosition(assetId, asset.quantity - quantity, asset.costPrice)
         }
@@ -229,7 +231,8 @@ class PortfolioRepository(private val database: AppDatabase) {
                     costPrice = item.costPerUnit, category = item.category, portfolioName = item.portfolioName,
                     currency = item.currency, marketSymbol = item.marketSymbol, lastPrice = item.unitPrice,
                     broker = item.broker, openingQuantity = openingQty, openingCostPrice = openingCost,
-                    priceSource = item.priceSource
+                    priceSource = item.priceSource, notes = item.notes,
+                    createdAt = item.createdAt, updatedAt = item.updatedAt
                 ))
                 item.sourceId?.let { sourceToLocal[it] = id }
                 acceptedAssets[key] = id to item
@@ -264,7 +267,9 @@ class PortfolioRepository(private val database: AppDatabase) {
                     id = if (overwrite) item.sourceId?.takeIf { it > 0L } ?: 0L else 0L,
                     assetId = asset.id, action = item.action, quantity = item.quantity,
                     unitPrice = item.unitPrice, fee = item.fee, realizedProfit = item.realizedProfit ?: 0.0,
-                    executedAt = item.executedAt, note = item.note, currency = item.currency, applied = item.applied
+                    executedAt = item.executedAt, note = item.note, currency = item.currency, applied = item.applied,
+                    createdAt = item.createdAt,
+                    realizedProfitTry = item.realizedProfitTry ?: if (item.currency == "TRY") (item.realizedProfit ?: 0.0) else 0.0
                 ))
                 if (item.action == "DIVIDEND" && item.applied) {
                     dividendDao.insert(DividendEntity(
@@ -381,7 +386,10 @@ class PortfolioRepository(private val database: AppDatabase) {
                     }
                     val realized = if (trade.action == "SELL") (trade.unitPrice - averageCost) * trade.quantity - trade.fee else 0.0
                     quantity = (quantity - trade.quantity).coerceAtLeast(0.0)
-                    tradeDao.update(trade.copy(realizedProfit = realized))
+                    tradeDao.update(trade.copy(
+                        realizedProfit = realized,
+                        realizedProfitTry = if (asset.currency == "TRY") realized else trade.realizedProfitTry
+                    ))
                     if (quantity == 0.0) averageCost = 0.0
                 }
                 "TRANSFER" -> Unit
