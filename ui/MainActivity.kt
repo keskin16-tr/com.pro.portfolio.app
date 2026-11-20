@@ -1356,7 +1356,7 @@ class MainActivity : AppCompatActivity() {
             val symbol = symbols[trade.assetId]?.ticker ?: "Varlık #${trade.assetId}"
             val type = tradeTypeLabel(trade.action)
             val amount = trade.quantity * trade.unitPrice
-            val result = if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}" else if (trade.action == "DIVIDEND") "\nNet temettü: ${currency(trade.unitPrice - trade.fee, trade.currency)}" else ""
+            val result = if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}" else if (trade.action == "DIVIDEND") "\nNet temettü: ${currency(trade.quantity * trade.unitPrice - trade.fee, trade.currency)}" else ""
             "${dateFormat.format(Date(trade.executedAt))}  •  $type $symbol\n${formatNumber(trade.quantity)} × ${currency(trade.unitPrice, trade.currency)} = ${currency(amount, trade.currency)}\n${if (trade.action == "DIVIDEND") "Stopaj" else "Komisyon"}: ${currency(trade.fee, trade.currency)}$result"
         }
     }
@@ -1440,7 +1440,7 @@ class MainActivity : AppCompatActivity() {
             })
             column.addView(TextView(this).apply {
                 text = "${dateFormat.format(Date(trade.executedAt))}\nMiktar: ${formatNumber(trade.quantity)} × ${currency(trade.unitPrice, trade.currency)}\n${if (trade.action == "DIVIDEND") "Stopaj" else "Komisyon"}: ${currency(trade.fee, trade.currency)}" +
-                    if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}" else if (trade.action == "DIVIDEND") "\nNet temettü: ${currency(trade.unitPrice - trade.fee, trade.currency)}" else ""
+                    if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}" else if (trade.action == "DIVIDEND") "\nNet temettü: ${currency(trade.quantity * trade.unitPrice - trade.fee, trade.currency)}" else ""
                 textSize = 13f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(6), 0, dp(10))
             })
             val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -1561,9 +1561,9 @@ class MainActivity : AppCompatActivity() {
                 }, initial.get(java.util.Calendar.HOUR_OF_DAY), initial.get(java.util.Calendar.MINUTE), true).show()
             }, initial.get(java.util.Calendar.YEAR), initial.get(java.util.Calendar.MONTH), initial.get(java.util.Calendar.DAY_OF_MONTH)).show()
         }
-        val quantity = field("Miktar", trade.quantity.toString()).apply { isEnabled = trade.action != "DIVIDEND" }
-        val price = field(if (trade.action == "DIVIDEND") "Brüt temettü" else "Birim fiyat", trade.unitPrice.toString())
-        val fee = field(if (trade.action == "DIVIDEND") "Stopaj tutarı" else "Komisyon", trade.fee.toString())
+        val quantity = field(if (trade.action == "DIVIDEND") "Adet / hisse başı temettü" else "Miktar", trade.quantity.toString())
+        val price = field(if (trade.action == "DIVIDEND") "Hisse başı temettü" else "Birim fiyat", trade.unitPrice.toString())
+        val fee = field(if (trade.action == "DIVIDEND") "Toplam stopaj tutarı" else "Komisyon", trade.fee.toString())
         val note = android.widget.EditText(this).apply { hint = "Not"; setText(trade.note); isSingleLine = true; inputType = android.text.InputType.TYPE_CLASS_TEXT }
         box.addView(TextView(this).apply { text = "İşlem türü"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)) })
         box.addView(action); box.addView(TextView(this).apply { text = "İşlem tarihi ve saati"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, dp(2)) }); box.addView(dateButton); box.addView(quantity); box.addView(price); box.addView(fee); box.addView(note)
@@ -1572,7 +1572,7 @@ class MainActivity : AppCompatActivity() {
                 val qty = parseNumber(quantity.text.toString()); val unitPrice = parseNumber(price.text.toString()); val commission = parseNumber(fee.text.toString()) ?: 0.0
                 if (qty == null || qty <= 0.0 || unitPrice == null || unitPrice < 0.0 || commission < 0.0) Toast.makeText(this, "Miktar, fiyat ve komisyon değerlerini kontrol edin.", Toast.LENGTH_LONG).show()
                 else if (trade.action == "DIVIDEND" && commission > unitPrice) Toast.makeText(this, "Stopaj brüt temettüden yüksek olamaz.", Toast.LENGTH_LONG).show()
-                 else viewModel.editTrade(trade.id, trade.action, if (trade.action == "DIVIDEND") 1.0 else qty, unitPrice, commission, note.text.toString(), executedAt) { result -> runOnUiThread {
+                 else viewModel.editTrade(trade.id, trade.action, qty, unitPrice, commission, note.text.toString(), executedAt) { result -> runOnUiThread {
                     result.onSuccess { Toast.makeText(this, "İşlem güncellendi; portföy ve kâr/zarar yeniden hesaplandı.", Toast.LENGTH_LONG).show() }
                         .onFailure { Toast.makeText(this, it.message ?: "İşlem güncellenemedi.", Toast.LENGTH_LONG).show() }
                 } }
