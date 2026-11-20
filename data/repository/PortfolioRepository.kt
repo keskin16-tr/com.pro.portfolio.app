@@ -260,7 +260,8 @@ class PortfolioRepository(private val database: AppDatabase) {
                             (sourceAsset == null || it.broker.equals(sourceAsset.broker, true))
                     } ?: return@forEach
                 val key = fingerprint(asset.id, item.action, item.quantity, item.unitPrice, item.fee, item.executedAt, item.currency, item.note)
-                if (!overwrite && (key in existingFingerprints || acceptedAssets.values.none { it.first == asset.id })) {
+                val isNewAssetInThisRestore = acceptedAssets.values.any { it.first == asset.id }
+                if (!overwrite && (key in existingFingerprints || (!isNewAssetInThisRestore && item.applied))) {
                     skippedTrades++
                     return@forEach
                 }
