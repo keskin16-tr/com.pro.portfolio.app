@@ -122,11 +122,17 @@ object ExcelImporter {
             val action = when (normalize(v(actionCol))) {
                 "BUY", "ALIS", "AL" -> "BUY"
                 "SELL", "SATIS", "SAT" -> "SELL"
+                "CASH IN", "PARA GIRISI", "PARA YATIRMA", "DEPOSIT" -> "CASH_IN"
+                "CASH OUT", "PARA CIKISI", "PARA CEKME", "WITHDRAWAL" -> "CASH_OUT"
+                "TRANSFER", "HAVALE", "VIRMAN" -> "TRANSFER"
                 "DIVIDEND", "TEMETTU" -> "DIVIDEND"
                 else -> return@mapNotNull null
             }
-            val qty = number(v(qtyCol)) ?: if (action == "DIVIDEND") 1.0 else return@mapNotNull null
-            val price = number(v(priceCol)) ?: return@mapNotNull null
+            val rawQty = number(v(qtyCol)) ?: if (action == "DIVIDEND") 1.0 else return@mapNotNull null
+            val rawPrice = number(v(priceCol)) ?: if (action in setOf("CASH_IN", "CASH_OUT", "TRANSFER")) 1.0 else return@mapNotNull null
+            // Excel'de temettü satırları adet × hisse başı temettü şeklinde tutuluyor.
+            val qty = if (action == "DIVIDEND") 1.0 else rawQty
+            val price = if (action == "DIVIDEND") rawQty * rawPrice else rawPrice
             val date = parseDate(v(dateCol)) ?: System.currentTimeMillis()
             val ticker = v(tickerCol).uppercase(Locale.ROOT).ifBlank { v(assetNameCol).uppercase(Locale.ROOT) }
             ImportedTrade(v(idCol).toLongOrNull(), v(assetIdCol).toLongOrNull(), ticker, action,
