@@ -66,8 +66,9 @@ object ExcelExporter {
                 assetRows += listOf(
                     asset.id, asset.name, asset.ticker, categoryLabel(asset.category),
                     asset.broker, asset.quantity, asset.lastPrice ?: asset.costPrice,
-                    asset.currency, asset.costPrice, null, null,
-                    null,
+                    asset.currency, asset.costPrice, asset.notes,
+                    asset.createdAt?.let { dateFormat.format(Date(it)) },
+                    asset.updatedAt?.let { dateFormat.format(Date(it)) },
                     sourceLabel(asset.priceSource), asset.marketSymbol
                 )
             }
@@ -84,9 +85,10 @@ object ExcelExporter {
                 tradeRows += listOf(
                     trade.id, trade.assetId, asset?.name ?: asset?.ticker.orEmpty(),
                     actionLabel(trade.action), trade.quantity, trade.unitPrice, trade.currency,
-                    dateFormat.format(Date(trade.executedAt)), trade.note, null,
+                    dateFormat.format(Date(trade.executedAt)), trade.note,
+                    trade.createdAt?.let { dateFormat.format(Date(it)) },
                     if (trade.applied) 1 else 0, trade.realizedProfit,
-                    if (trade.currency.equals("TRY", true)) trade.realizedProfit else null
+                    if (trade.currency.equals("TRY", true)) trade.realizedProfit else trade.realizedProfitTry
                 )
             }
 
