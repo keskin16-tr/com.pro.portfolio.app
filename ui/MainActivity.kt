@@ -209,7 +209,7 @@ class MainActivity : AppCompatActivity() {
                     .setMessage(
                         "${backup.assets.size} varlık ve ${backup.trades.size} işlem bulundu.\n$transactionSummary\n\n" +
                             "Örnek varlıklar:\n$preview\n\n" +
-                            "Birleştir: mevcut varlıkları korur, yeni varlıkları ve mükerrer olmayan geçmiş işlemleri ekler. Uygulanmış işlemler mevcut bakiyeye ikinci kez uygulanmaz.\n\n" +
+                            "Birleştir: mevcut varlıkları korur ve mükerrer olmayan işlem geçmişini ekler. Mevcut varlıklara ait içe aktarılan işlemler geçmiş kaydı olarak saklanır; bakiyeye yeniden uygulanmaz.\n\n" +
                             "Tamamen değiştir: mevcut portföy ve geçmiş kayıtlarını Excel yedeğiyle değiştirir."
                     )
                     .setNegativeButton("Vazgeç", null)
