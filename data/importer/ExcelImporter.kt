@@ -259,7 +259,8 @@ object ExcelImporter {
         "ALTIN", "GOLD", "KIYMETLIMADEN" -> "GOLD"
         "ALTIN EMTIA", "ALTINEMTIA", "EMTIA", "COMMODITY" -> "COMMODITY"
         "TAHVIL", "BONO", "TAHVILBONO", "BOND" -> "BOND"
-        "BANKA", "NAKIT", "CASH" -> "CASH"
+        "BANKA" -> "BANK"
+        "NAKIT", "CASH" -> "CASH"
         else -> "OTHER"
     }
     private fun priceSource(v: String) = when (normalize(v)) {
