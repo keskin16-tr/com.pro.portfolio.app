@@ -77,13 +77,15 @@ class MainViewModel(application:Application):AndroidViewModel(application){
   }
  }
  fun refreshRates(){viewModelScope.launch{syncRates()}}
- fun addAsset(name:String,ticker:String,quantity:Double,costPrice:Double,category:String,broker:String,currency:String,priceSource:String,manualPrice:Double?){viewModelScope.launch{runCatching{repository.recordBuy(name,ticker,quantity,costPrice,category=category,currency=currency,broker=broker,priceSource=priceSource,manualPrice=manualPrice)}}}
+ fun addAsset(name:String,ticker:String,quantity:Double,costPrice:Double,category:String,broker:String,currency:String,priceSource:String,manualPrice:Double?,fee:Double=0.0,note:String="Alış işlemi"){viewModelScope.launch{runCatching{repository.recordBuy(name,ticker,quantity,costPrice,category=category,currency=currency,broker=broker,priceSource=priceSource,manualPrice=manualPrice,fee=fee,note=note)}}}
  fun importHoldings(rows:List<ImportedHolding>,onResult:(Result<Pair<Int,Int>>)->Unit){viewModelScope.launch{onResult(runCatching{repository.importHoldings(rows)})}}
  fun restorePortfolio(backup:ImportedPortfolio,overwrite:Boolean,onResult:(Result<PortfolioRepository.RestoreResult>)->Unit){viewModelScope.launch{onResult(runCatching{repository.restorePortfolio(backup,overwrite)})}}
  fun classifyAsset(assetId:Long,category:String,broker:String,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.classifyAsset(assetId,category,broker)})}}
- fun addDividend(ticker:String,grossAmount:Double,taxPercent:Double,currency:String){viewModelScope.launch{runCatching{repository.recordDividend(ticker,grossAmount,taxPercent,currency)}}}
- fun sellAsset(assetId:Long,quantity:Double,unitPrice:Double,fee:Double,onResult:(Result<Unit>)->Unit){
-  viewModelScope.launch{onResult(runCatching{repository.recordSell(assetId,quantity,unitPrice,fee)})}
+ fun addDividend(ticker:String,grossAmount:Double,taxPercent:Double,currency:String,note:String=""){viewModelScope.launch{runCatching{repository.recordDividend(ticker,grossAmount,taxPercent,currency,note=note)}}}
+ fun addCashFlow(assetId:Long,action:String,amount:Double,note:String,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.recordCashFlow(assetId,action,amount,note)})}}
+ fun transferAsset(assetId:Long,destinationAccount:String,note:String,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.recordTransfer(assetId,destinationAccount,note)})}}
+ fun sellAsset(assetId:Long,quantity:Double,unitPrice:Double,fee:Double,note:String="Satış işlemi",onResult:(Result<Unit>)->Unit){
+  viewModelScope.launch{onResult(runCatching{repository.recordSell(assetId,quantity,unitPrice,fee,note)})}
  }
  fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String,quantity:Double?,costPrice:Double?,currency:String,priceSource:String,manualPrice:Double?,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.updateAssetDetails(assetId,name,ticker,category,broker,quantity,costPrice,currency,priceSource,manualPrice)})}}
  fun editTrade(tradeId:Long,action:String,quantity:Double,unitPrice:Double,fee:Double,note:String,executedAt:Long,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.editTrade(tradeId,action,quantity,unitPrice,fee,note,executedAt)})}}
