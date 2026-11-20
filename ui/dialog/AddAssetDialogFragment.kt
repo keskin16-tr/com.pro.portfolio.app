@@ -38,7 +38,7 @@ class AddAssetDialogFragment(private val onSave: (String, String, Double, Double
             val ticker = binding.etTicker.text?.toString()?.trim()?.uppercase(Locale.ROOT).orEmpty()
             val quantity = parseNumber(binding.etQuantity.text?.toString().orEmpty())
             val costPrice = parseNumber(binding.etCostPrice.text?.toString().orEmpty())
-            val categories = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
+            val categories = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "BANK", "CASH", "OTHER")
             val category = categories.getOrElse(binding.spinnerCategory.selectedItemPosition) { "OTHER" }
             val currency = if (binding.spinnerCurrency.selectedItemPosition == 1) "USD" else "TRY"
             val priceSource = listOf("AUTO", "YAHOO_FINANCE", "COINGECKO", "FRANKFURTER", "MANUAL").getOrElse(binding.spinnerPriceSource.selectedItemPosition) { "AUTO" }
