@@ -67,7 +67,7 @@ object ExcelExporter {
                     asset.id, asset.name, asset.ticker, categoryLabel(asset.category),
                     asset.broker, asset.quantity, asset.lastPrice ?: asset.costPrice,
                     asset.currency, asset.costPrice, null, null,
-                    asset.priceUpdatedAt?.let { dateFormat.format(Date(it)) },
+                    null,
                     sourceLabel(asset.priceSource), asset.marketSymbol
                 )
             }
