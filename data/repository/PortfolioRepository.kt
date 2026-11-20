@@ -130,7 +130,9 @@ class PortfolioRepository(private val database: AppDatabase) {
             val tax = grossAmount * taxPercent / 100.0
             val tradeId = tradeDao.insert(TradeEntity(
                 assetId = asset.id, action = "DIVIDEND", quantity = 1.0, unitPrice = grossAmount,
-                fee = tax, executedAt = paymentDate, note = note.ifBlank { "Temettü ödemesi" }, currency = currency
+                fee = tax, realizedProfit = grossAmount,
+                realizedProfitTry = if (currency.equals("TRY", true)) grossAmount else 0.0,
+                executedAt = paymentDate, note = note.ifBlank { "Temettü ödemesi" }, currency = currency
             ))
             dividendDao.insert(DividendEntity(
                 assetId = asset.id, ticker = asset.ticker, quantityAtPayment = asset.quantity,
