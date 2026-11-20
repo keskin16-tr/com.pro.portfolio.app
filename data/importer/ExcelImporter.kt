@@ -130,14 +130,14 @@ object ExcelImporter {
             }
             val rawQty = number(v(qtyCol)) ?: if (action == "DIVIDEND") 1.0 else return@mapNotNull null
             val rawPrice = number(v(priceCol)) ?: if (action in setOf("CASH_IN", "CASH_OUT", "TRANSFER")) 1.0 else return@mapNotNull null
-            // Excel'de temettü satırları adet × hisse başı temettü şeklinde tutuluyor.
-            val qty = if (action == "DIVIDEND") 1.0 else rawQty
-            val price = if (action == "DIVIDEND") rawQty * rawPrice else rawPrice
+            // Kaynak çalışma kitabındaki miktar ve birim fiyat değerlerini aynen koru.
+            // Temettüde quantity × unit_price toplam temettü tutarını verir.
             val date = parseDate(v(dateCol)) ?: System.currentTimeMillis()
-            val ticker = v(tickerCol).uppercase(Locale.ROOT).ifBlank { v(assetNameCol).uppercase(Locale.ROOT) }
+            val note = v(noteCol)
+            val ticker = v(tickerCol).ifBlank { note }.ifBlank { v(assetNameCol) }.uppercase(Locale.ROOT)
             ImportedTrade(v(idCol).toLongOrNull(), v(assetIdCol).toLongOrNull(), ticker, action,
-                qty, price, number(v(feeCol)) ?: 0.0, v(currencyCol).ifBlank { "TRY" }.uppercase(Locale.ROOT),
-                date, v(noteCol), number(v(realizedCol)), v(appliedCol).let { it.isBlank() || normalize(it) in setOf("TRUE", "1", "YES", "EVET", "UYGULANDI") })
+                rawQty, rawPrice, number(v(feeCol)) ?: 0.0, v(currencyCol).ifBlank { "TRY" }.uppercase(Locale.ROOT),
+                date, note, number(v(realizedCol)), v(appliedCol).let { it.isBlank() || normalize(it) in setOf("TRUE", "1", "YES", "EVET", "UYGULANDI") })
         }
     }
 
@@ -238,15 +238,15 @@ object ExcelImporter {
         return null
     }
     private fun category(v: String) = when (normalize(v)) {
-        "HISSE", "HISSEBIST", "HISSESENEDI", "STOCK", "BIST" -> "STOCK"
-        "AMERIKANBORSALARI", "AMERIKANHISSE", "USSTOCK", "USSTOCKS", "NASDAQ", "NYSE", "USA" -> "US_STOCK"
+        "HISSE", "HISSEBIST", "BISTHISSE", "HISSESENEDI", "STOCK", "BIST" -> "STOCK"
+        "ABD HISSE ETF", "ABDHISSEETF", "AMERIKANBORSALARI", "AMERIKANHISSE", "USSTOCK", "USSTOCKS", "NASDAQ", "NYSE", "USA" -> "US_STOCK"
         "FON", "YATIRIMFONU", "FUND" -> "FUND"
         "KRIPTO", "KRIPTOPARA", "CRYPTO" -> "CRYPTO"
         "DOVIZ", "FX", "CURRENCY" -> "FX"
         "ALTIN", "GOLD", "KIYMETLIMADEN" -> "GOLD"
-        "EMTIA", "COMMODITY" -> "COMMODITY"
+        "ALTIN EMTIA", "ALTINEMTIA", "EMTIA", "COMMODITY" -> "COMMODITY"
         "TAHVIL", "BONO", "TAHVILBONO", "BOND" -> "BOND"
-        "NAKIT", "CASH" -> "CASH"
+        "BANKA", "NAKIT", "CASH" -> "CASH"
         else -> "OTHER"
     }
     private fun priceSource(v: String) = when (normalize(v)) {
