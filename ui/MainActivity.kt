@@ -203,7 +203,7 @@ class MainActivity : AppCompatActivity() {
                 val preview = backup.assets.take(10).joinToString("\n") {
                     "${it.ticker} • ${formatNumber(it.quantity)} adet • ${currency(it.costPerUnit, it.currency)}"
                 } + if (backup.assets.size > 10) "\n… ve ${backup.assets.size - 10} varlık daha" else ""
-                val transactionSummary = "Alış: ${tradeCounts["BUY"] ?: 0} • Satış: ${tradeCounts["SELL"] ?: 0} • Temettü: ${tradeCounts["DIVIDEND"] ?: 0}"
+                val transactionSummary = "Alış: ${tradeCounts["BUY"] ?: 0} • Satış: ${tradeCounts["SELL"] ?: 0} • Para girişi: ${tradeCounts["CASH_IN"] ?: 0} • Para çıkışı: ${tradeCounts["CASH_OUT"] ?: 0} • Transfer: ${tradeCounts["TRANSFER"] ?: 0} • Temettü: ${tradeCounts["DIVIDEND"] ?: 0}"
                 androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
                     .setTitle("Excel yedeği doğrulandı")
                     .setMessage(
@@ -321,7 +321,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     filters.addView(spinner, LinearLayout.LayoutParams(0, dp(48), 1f))
                 }
-                addFilter(listOf("Tümü", "Alış", "Satış", "Temettü")) { tradeActionFilter = it }
+                addFilter(listOf("Tümü", "Alış", "Satış", "Para Girişi", "Para Çıkışı", "Transfer", "Temettü")) { tradeActionFilter = it }
                 addFilter(listOf("Tümü", "TRY", "USD")) { tradeCurrencyFilter = it }
                 addFilter(listOf("Tümü", "7 gün", "30 gün", "90 gün", "Bu yıl")) { tradeDateFilter = it }
                 content.addView(filters)
@@ -452,7 +452,7 @@ class MainActivity : AppCompatActivity() {
         pageTexts[NAV_CATEGORIES]?.text = ""
         pageTexts[NAV_BROKERS]?.text = ""
         pageTexts[NAV_IMPORT]?.text =
-            "Excel (.xlsx) dosyasının ilk sayfasında Sembol, Varlık, Kategori, Adet ve Ortalama Maliyet sütunları bulunmalı.\n\nBu işlem mevcut portföy varlıklarını içe aktarır; işlem ve temettü geçmişini içe aktarmaz. Portfolio Pro dışa aktarma dosyaları doğrudan kullanılabilir. Aynı sembol varsa tekrar eklenmez. Önizleme onayından sonra yeni kayıtlar eklenir."
+            "Excel çalışma kitabında Varlıklar ve İşlemler sayfaları bulunmalıdır. Varlıklar sayfası id, name, symbol, category, account, quantity, unit_price, currency ve cost_per_unit alanlarını; İşlemler sayfası işlem türü, miktar, birim fiyat, tarih, applied ve gerçekleşen kâr/zarar alanlarını kullanır. Alış, satış, para girişi, para çıkışı, transfer ve temettü geçmişi birlikte geri yüklenir. Birleştirme mevcut varlıkları korur; tam değiştirme mevcut portföyü yedek dosyayla değiştirir."
         pageTexts[NAV_MORE]?.text =
             "Kategori ve aracı kurum dağılımlarını inceleyin; temettü kayıtlarına ulaşın veya Excel dosyalarını içe/dışa aktarın."
         pageTexts[NAV_EXPORT]?.text =
