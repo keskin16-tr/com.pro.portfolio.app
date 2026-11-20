@@ -456,7 +456,7 @@ class MainActivity : AppCompatActivity() {
         pageTexts[NAV_MORE]?.text =
             "Kategori ve aracı kurum dağılımlarını inceleyin; temettü kayıtlarına ulaşın veya Excel dosyalarını içe/dışa aktarın."
         pageTexts[NAV_EXPORT]?.text =
-            "Excel çalışma kitabı Portföy, İşlemler ve Temettüler sayfalarını içerir. Portföy sayfasında kategori ve aracı kurum bilgileri de bulunur. Kayıtlar cihazınızdaki yerel veritabanından alınır."
+            "Excel çalışma kitabı, kullandığınız dosyayla aynı Varlıklar ve İşlemler sayfalarını ve aynı sütun adlarını kullanır. Alış, satış, para girişi, para çıkışı, transfer ve temettü kayıtları tek işlem geçmişinde saklanır."
         renderAnalytics()
     }
 
@@ -1298,52 +1298,6 @@ class MainActivity : AppCompatActivity() {
                             Toast.makeText(this, "Temettü işlemi kaydediliyor.", Toast.LENGTH_SHORT).show()
                         }
                     }
-                }
-            }.show()
-    }
-
-    private fun showDividendDialog() {
-        if (currentAssets.isEmpty()) {
-            Toast.makeText(this, "Temettü kaydetmeden önce ilgili varlığı ekleyin.", Toast.LENGTH_LONG).show()
-            return
-        }
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(8), dp(22), 0) }
-        val assetSpinner = android.widget.Spinner(this).apply {
-            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, currentAssets.map { "${it.ticker} — ${it.name}" })
-        }
-        val currencySpinner = android.widget.Spinner(this).apply {
-            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Türk Lirası (TRY)", "ABD Doları (USD)"))
-        }
-        fun field(hint: String) = android.widget.EditText(this).apply {
-            this.hint = hint; isSingleLine = true
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-        }
-        val gross = field("Brüt temettü tutarı")
-        val tax = field("Stopaj oranı (%)").apply { setText("0") }
-        val note = android.widget.EditText(this).apply { hint = "Not (isteğe bağlı)" }
-        box.addView(TextView(this).apply { text = "Temettü alınan varlık"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)) })
-        box.addView(assetSpinner)
-        box.addView(TextView(this).apply { text = "Ödeme para birimi"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(10), 0, 0) })
-        box.addView(currencySpinner); box.addView(gross); box.addView(tax); box.addView(note)
-        assetSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
-            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                currencySpinner.setSelection(if (currentAssets[position].currency == "USD") 1 else 0)
-            }
-        }
-        androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Temettüyü işlem olarak ekle").setView(box)
-            .setNegativeButton("İptal", null)
-            .setPositiveButton("Kaydet") { _, _ ->
-                val asset = currentAssets[assetSpinner.selectedItemPosition.coerceIn(0, currentAssets.lastIndex)]
-                val amount = parseNumber(gross.text.toString())
-                val taxRate = parseNumber(tax.text.toString()) ?: 0.0
-                val currencyCode = if (currencySpinner.selectedItemPosition == 1) "USD" else "TRY"
-                if (amount == null || amount <= 0.0 || taxRate !in 0.0..100.0) {
-                    Toast.makeText(this, "Pozitif brüt tutar ve %0–100 stopaj girin.", Toast.LENGTH_LONG).show()
-                } else {
-                    viewModel.addDividend(asset.ticker, amount, taxRate, currencyCode)
-                    Toast.makeText(this, "Temettü işlemi kaydediliyor.", Toast.LENGTH_SHORT).show()
-                    showPage(NAV_TRADES)
                 }
             }.show()
     }
