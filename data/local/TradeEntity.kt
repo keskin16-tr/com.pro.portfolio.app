@@ -16,5 +16,7 @@ data class TradeEntity(
  val executedAt:Long=System.currentTimeMillis(),
  val note:String="",
  @ColumnInfo(defaultValue="'TRY'") val currency:String="TRY",
- @ColumnInfo(defaultValue="1") val applied:Boolean=true
+ @ColumnInfo(defaultValue="1") val applied:Boolean=true,
+ val createdAt:Long?=null,
+ @ColumnInfo(defaultValue="0.0") val realizedProfitTry:Double=0.0
 )
