@@ -38,7 +38,11 @@ class PortfolioRepository(private val database: AppDatabase) {
         if (priceSource == "MANUAL") require(manualPrice != null && manualPrice >= 0.0) { "Elle giriş için güncel fiyat girin." }
         require(quantity > 0.0 && unitPrice >= 0.0 && fee >= 0.0)
         database.withTransaction {
-            val existing = assetDao.getAssetsOnce().firstOrNull { it.ticker.equals(ticker, ignoreCase = true) }
+            val existing = assetDao.getAssetsOnce().firstOrNull {
+                it.ticker.equals(ticker, ignoreCase = true) &&
+                    it.currency.equals(currency, ignoreCase = true) &&
+                    it.broker.equals(broker, ignoreCase = true)
+            }
             val assetId = existing?.id ?: assetDao.insertAsset(
                 AssetEntity(
                     name = name.trim(), ticker = ticker.trim().uppercase(), quantity = 0.0, costPrice = 0.0,
@@ -110,13 +114,17 @@ class PortfolioRepository(private val database: AppDatabase) {
 
     suspend fun recordDividend(
         ticker: String, grossAmount: Double, taxPercent: Double = 0.0,
-        currency: String = "TRY", paymentDate: Long = System.currentTimeMillis(), note: String = ""
+        currency: String = "TRY", paymentDate: Long = System.currentTimeMillis(), note: String = "",
+        broker: String? = null
     ) {
         require(currency.uppercase() in listOf("TRY", "USD")) { "Temettü para birimi yalnızca TRY veya USD olabilir." }
         require(grossAmount > 0.0 && taxPercent in 0.0..100.0)
         database.withTransaction {
-            val asset = assetDao.getAssetsOnce().firstOrNull { it.ticker.equals(ticker.trim(), true) }
-                ?: error("Bu sembole ait portföy varlığı bulunamadı")
+            val asset = assetDao.getAssetsOnce().firstOrNull {
+                it.ticker.equals(ticker.trim(), true) &&
+                    it.currency.equals(currency, true) &&
+                    (broker.isNullOrBlank() || it.broker.equals(broker, true))
+            } ?: error("Bu sembol ve hesap için portföy varlığı bulunamadı")
             val tax = grossAmount * taxPercent / 100.0
             val tradeId = tradeDao.insert(TradeEntity(
                 assetId = asset.id, action = "DIVIDEND", quantity = 1.0, unitPrice = grossAmount,
@@ -180,13 +188,15 @@ class PortfolioRepository(private val database: AppDatabase) {
                 assetDao.deleteAll()
             }
             val existingAssets = assetDao.getAssetsOnce()
-            val existingByKey = existingAssets.associateBy { it.ticker.uppercase() + "|" + it.currency.uppercase() }
+            fun assetKey(ticker: String, currency: String, broker: String) =
+                ticker.uppercase() + "|" + currency.uppercase() + "|" + broker.trim().uppercase()
+            val existingByKey = existingAssets.associateBy { assetKey(it.ticker, it.currency, it.broker) }
             val sourceToLocal = mutableMapOf<Long, Long>()
             val acceptedKeys = mutableSetOf<String>()
             val acceptedAssets = mutableMapOf<String, Pair<Long, ImportedAsset>>()
 
             backup.assets.forEach { item ->
-                val key = item.ticker.uppercase() + "|" + item.currency.uppercase()
+                val key = assetKey(item.ticker, item.currency, item.broker)
                 val existing = existingByKey[key]
                 if (!overwrite && existing != null) {
                     skippedAssets++
@@ -241,10 +251,11 @@ class PortfolioRepository(private val database: AppDatabase) {
                     ?: sourceAsset?.sourceId?.let { sourceToLocal[it] }
                 val asset = mappedId?.let { assetDao.getById(it) }
                     ?: assetDao.getAssetsOnce().firstOrNull {
-                        it.ticker.equals(item.ticker, true) && it.currency.equals(item.currency, true)
+                        it.ticker.equals(item.ticker, true) && it.currency.equals(item.currency, true) &&
+                            (sourceAsset == null || it.broker.equals(sourceAsset.broker, true))
                     } ?: return@forEach
                 val key = fingerprint(asset.id, item.action, item.quantity, item.unitPrice, item.fee, item.executedAt, item.currency, item.note)
-                if (!overwrite && (key in existingFingerprints || !acceptedAssets.containsKey(asset.ticker.uppercase() + "|" + asset.currency.uppercase()))) {
+                if (!overwrite && (key in existingFingerprints || acceptedAssets.values.none { it.first == asset.id })) {
                     skippedTrades++
                     return@forEach
                 }
