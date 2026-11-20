@@ -106,6 +106,7 @@ object ExcelExporter {
         "FX" -> "Döviz"
         "GOLD", "COMMODITY" -> "Altın / Emtia"
         "BOND" -> "Tahvil / Bono"
+        "BANK" -> "Banka"
         "CASH" -> "Nakit"
         else -> "Diğer"
     }
