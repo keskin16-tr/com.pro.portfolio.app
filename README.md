@@ -1,6 +1,6 @@
 # Portfolio Pro
 
-**Portfolio Pro**, Kotlin ile geliştirilmiş Android portföy takip uygulamasıdır. Uygulama; farklı varlıkları tek yerde izlemek, alış/satış/temettü işlemlerini kaydetmek, portföy performansını takip etmek ve Excel dosyaları üzerinden veri aktarımı yapmak için geliştirilir.
+**Portfolio Pro**, Kotlin ile geliştirilmiş Android portföy takip uygulamasıdır. Uygulama; farklı varlıkları tek yerde izlemek, alış/satış/para girişi/para çıkışı/transfer/temettü işlemlerini kaydetmek, portföy performansını takip etmek ve Excel dosyaları üzerinden veri aktarımı yapmak için geliştirilir.
 
 > Sürüm: **4.3.0**  
 > Android uygulama kimliği: `com.portfolio.app`  
@@ -11,7 +11,7 @@
 
 - Portföye varlık ekleme ve varlık bilgilerini düzenleme
 - TRY ve USD cinsinden varlıkları takip etme
-- Alış, satış ve temettü işlemlerini kaydetme
+- Alış, satış, para girişi, para çıkışı, transfer ve temettü işlemlerini tek işlem ekranından kaydetme
 - İşlem geçmişini görüntüleme ve işlemleri düzenleme/silme
 - Ortalama maliyet, mevcut miktar ve gerçekleşen kâr/zarar hesaplamaları
 - Güncel fiyat ve döviz kuru verilerini uygulama içinde takip etme
@@ -95,17 +95,21 @@ Sayfa ve sütun adları Türkçe/İngilizce eş anlamlı başlıklarla tanınır
 
 ### Varlık sütunları
 
-Önerilen alanlar:
+Kullanılan Excel şablonundaki sütunlar:
 
-`id`, `name`, `symbol`, `category`, `account`, `quantity`, `unit_price`, `currency`, `cost_per_unit`, `broker`, `price_source`, `market_symbol`
+`id`, `name`, `symbol`, `category`, `account`, `quantity`, `unit_price`, `currency`, `cost_per_unit`, `notes`, `created_at`, `updated_at`, `price_source`, `market_symbol`
+
+Aynı sembol ve para birimine sahip varlıklar farklı hesaplarda bulunabilir. Bu kayıtlar `account` alanına göre ayrı varlıklar olarak korunur. `Banka` ve `Nakit` kategorileri birbirinden ayrı tutulur.
 
 ### İşlem sütunları
 
-Önerilen alanlar:
+Kullanılan Excel şablonundaki sütunlar:
 
-`id`, `asset_id`, `asset_name`, `transaction_type`, `quantity`, `unit_price`, `currency`, `transaction_date`, `notes`, `fee`, `applied`, `realized_pnl`
+`id`, `asset_id`, `asset_name`, `transaction_type`, `quantity`, `unit_price`, `currency`, `transaction_date`, `notes`, `created_at`, `applied`, `realized_pnl`, `realized_pnl_try`
 
-İşlem türleri alış (`BUY`), satış (`SELL`) ve temettü (`DIVIDEND`) kayıtlarını kapsar. Tarihler Excel tarih seri numarası, Unix zaman damgası ve ISO-8601 tarih biçimlerinden okunabilir.
+İşlem türleri alış (`BUY`), satış (`SELL`), para girişi (`CASH_IN`), para çıkışı (`CASH_OUT`), transfer (`TRANSFER`) ve temettü (`DIVIDEND`) kayıtlarını kapsar. `applied=0` olan geçmiş kayıtları işlem geçmişinde korunur, varlık miktarına ikinci kez uygulanmaz. Tarihler Excel tarih seri numarası, Unix zaman damgası ve ISO-8601 tarih biçimlerinden okunabilir.
+
+Excel dışa aktarma da aynı iki sayfa adını ve sütun düzenini kullanır: `Varlıklar` ve `İşlemler`.
 
 ### Geri yükleme seçenekleri
 
