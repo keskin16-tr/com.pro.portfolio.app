@@ -93,7 +93,7 @@ class MainViewModel(application:Application):AndroidViewModel(application){
  fun importHoldings(rows:List<ImportedHolding>,onResult:(Result<Pair<Int,Int>>)->Unit){viewModelScope.launch{onResult(runCatching{repository.importHoldings(rows)})}}
  fun restorePortfolio(backup:ImportedPortfolio,overwrite:Boolean,onResult:(Result<PortfolioRepository.RestoreResult>)->Unit){viewModelScope.launch{onResult(runCatching{repository.restorePortfolio(backup,overwrite)})}}
  fun classifyAsset(assetId:Long,category:String,broker:String,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.classifyAsset(assetId,category,broker)})}}
- fun addDividend(ticker:String,grossAmount:Double,taxPercent:Double,currency:String,note:String=""){viewModelScope.launch{runCatching{repository.recordDividend(ticker,grossAmount,taxPercent,currency,note=note)}}}
+ fun addDividend(ticker:String,grossAmount:Double,taxPercent:Double,currency:String,note:String="",broker:String?=null){viewModelScope.launch{runCatching{repository.recordDividend(ticker,grossAmount,taxPercent,currency,note=note,broker=broker)}}}
  fun addCashFlow(assetId:Long,action:String,amount:Double,note:String,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.recordCashFlow(assetId,action,amount,note)})}}
  fun transferAsset(assetId:Long,destinationAccount:String,note:String,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.recordTransfer(assetId,destinationAccount,note)})}}
  fun sellAsset(assetId:Long,quantity:Double,unitPrice:Double,fee:Double,note:String="Satış işlemi",onResult:(Result<Unit>)->Unit){
