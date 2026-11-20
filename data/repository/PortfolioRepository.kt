@@ -252,14 +252,14 @@ class PortfolioRepository(private val database: AppDatabase) {
                 val tradeId = tradeDao.insert(TradeEntity(
                     id = if (overwrite) item.sourceId?.takeIf { it > 0L } ?: 0L else 0L,
                     assetId = asset.id, action = item.action, quantity = item.quantity,
-                    unitPrice = item.unitPrice, fee = item.fee, realizedProfit = if (item.applied) item.realizedProfit ?: 0.0 else 0.0,
+                    unitPrice = item.unitPrice, fee = item.fee, realizedProfit = item.realizedProfit ?: 0.0,
                     executedAt = item.executedAt, note = item.note, currency = item.currency, applied = item.applied
                 ))
                 if (item.action == "DIVIDEND" && item.applied) {
                     dividendDao.insert(DividendEntity(
                         assetId = asset.id, ticker = asset.ticker, quantityAtPayment = asset.quantity,
-                        grossAmount = item.unitPrice, withholdingTax = item.fee,
-                        netAmount = item.unitPrice - item.fee, currency = item.currency,
+                        grossAmount = item.quantity * item.unitPrice, withholdingTax = item.fee,
+                        netAmount = item.quantity * item.unitPrice - item.fee, currency = item.currency,
                         exDate = item.executedAt, paymentDate = item.executedAt, note = item.note, tradeId = tradeId
                     ))
                 }
@@ -325,12 +325,12 @@ class PortfolioRepository(private val database: AppDatabase) {
                 note = note, executedAt = executedAt
             ))
             if (action == "DIVIDEND") {
-                require(quantity == 1.0 && fee <= unitPrice) { "Temettü miktarı 1 olmalı ve stopaj brüt tutarı aşmamalı." }
+                require(fee <= quantity * unitPrice) { "Stopaj brüt temettü tutarını aşmamalı." }
                 val existingDividend = dividendDao.getByTradeId(tradeId)
                 val updated = DividendEntity(
                     id = existingDividend?.id ?: 0L, assetId = current.assetId, ticker = asset.ticker,
-                    quantityAtPayment = asset.quantity, grossAmount = unitPrice, withholdingTax = fee,
-                    netAmount = unitPrice - fee, currency = current.currency, exDate = executedAt,
+                    quantityAtPayment = asset.quantity, grossAmount = quantity * unitPrice, withholdingTax = fee,
+                    netAmount = quantity * unitPrice - fee, currency = current.currency, exDate = executedAt,
                     paymentDate = executedAt, note = note, tradeId = tradeId
                 )
                 if (existingDividend == null) dividendDao.insert(updated) else dividendDao.update(updated)
