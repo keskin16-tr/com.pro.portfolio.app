@@ -40,12 +40,12 @@ class AddAssetDialogFragment(private val onSave: (String, String, Double, Double
             val costPrice = parseNumber(binding.etCostPrice.text?.toString().orEmpty())
             val categories = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "BANK", "CASH", "OTHER")
             val category = categories.getOrElse(binding.spinnerCategory.selectedItemPosition) { "OTHER" }
-            val currency = if (binding.spinnerCurrency.selectedItemPosition == 1) "USD" else "TRY"
+            val currency = listOf("TRY", "USD", "USDT", "EUR", "GBP").getOrElse(binding.spinnerCurrency.selectedItemPosition) { "TRY" }
             val priceSource = listOf("AUTO", "YAHOO_FINANCE", "COINGECKO", "FRANKFURTER", "MANUAL").getOrElse(binding.spinnerPriceSource.selectedItemPosition) { "AUTO" }
             val manualPrice = if (priceSource == "MANUAL") parseNumber(binding.etManualPrice.text?.toString().orEmpty()) else null
             val selectedBroker = binding.spinnerBroker.selectedItem?.toString().orEmpty()
             val broker = if (selectedBroker == "Diğer") binding.etBrokerCustom.text?.toString()?.trim().orEmpty().ifBlank { "Belirtilmedi" } else selectedBroker
-            if (name.isNotBlank() && ticker.isNotBlank() && quantity != null && costPrice != null && quantity > 0.0 && costPrice >= 0.0 && (priceSource != "MANUAL" || (manualPrice != null && manualPrice >= 0.0))) {
+            if (name.isNotBlank() && (ticker.isNotBlank() || category in setOf("BANK", "CASH")) && quantity != null && costPrice != null && quantity > 0.0 && costPrice >= 0.0 && (priceSource != "MANUAL" || (manualPrice != null && manualPrice >= 0.0))) {
                 onSave(name, ticker, quantity, costPrice, category, broker, currency, priceSource, manualPrice)
                 dismiss()
             } else {
