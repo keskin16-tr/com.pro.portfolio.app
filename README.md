@@ -2,7 +2,7 @@
 
 **Portfolio Pro**, Kotlin ile geliştirilmiş Android portföy takip uygulamasıdır. Uygulama; farklı varlıkları tek yerde izlemek, alış/satış/para girişi/para çıkışı/transfer/temettü işlemlerini kaydetmek, portföy performansını takip etmek ve Excel dosyaları üzerinden veri aktarımı yapmak için geliştirilir.
 
-> Sürüm: **4.3.0**  
+> Sürüm: **4.3.1**  
 > Android uygulama kimliği: `com.portfolio.app`  
 > Minimum Android: **7.0 (API 24)**  
 > Derleme SDK: **35**
@@ -166,3 +166,12 @@ Windows PowerShell Base64:
 ```
 
 Keystore dosyasını ve parolalarını güvenli bir yerde saklayın; sonraki sürümlerde aynı anahtar kullanılmalıdır. **Önemli:** Daha önce kurulmuş APK farklı/geçici bir debug anahtarıyla imzalandıysa yeni kalıcı anahtar o eski APK'nın imzasını geriye dönük olarak eşleştiremez. Bu durumda ilk geçişte uygulama verilerini Excel ile yedekleyip eski uygulamayı bir kez kaldırmak ve kalıcı imzalı sürümü kurmak gerekir. Sonraki sürümler aynı keystore ile imzalanırsa kaldırmadan güncellenebilir.
+
+
+### 4.3.1 düzenleme ve Excel uyumluluğu
+
+- Excel içe aktarma, sayfa başında başlık satırı veya boş satır bulunsa da sütun başlıklarını arar.
+- İşlem kayıtları `asset_id` ile; kimlik bulunmadığında sembol veya varlık adı ile eşleştirilir. Excel'in sayısal kimlikleri `12.0` biçiminde saklaması da desteklenir.
+- Dışa aktarma yalnızca `Varlıklar` ve `İşlemler` sayfalarını üretir. Temettü kayıtları `İşlemler` sayfasında `Temettü` türü olarak yer alır.
+- Varlık düzenleme ekranında görünen sembol (`symbol`) ile veri sağlayıcısına gönderilen piyasa sembolü/sorgu terimi (`market_symbol`) ayrı alanlardır. Hesap, aracı kurum, not, veri kaynağı, güncel fiyat, miktar ve maliyet alanları da gösterilir.
+- İşlem düzenleme ekranında işlem türü, bağlı varlık/hesap, tarih, miktar, fiyat, komisyon/stopaj ve not değiştirilebilir.
