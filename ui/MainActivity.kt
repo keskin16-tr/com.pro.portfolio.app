@@ -464,7 +464,7 @@ class MainActivity : AppCompatActivity() {
         val displayCurrency = selectedSummaryCurrency
         val usdTry = currentRates.firstOrNull { it.title.equals("Dolar / TL", true) }?.value
         val hasTry = currentAssets.any { it.currency.equals("TRY", true) } || currentTrades.any { it.currency.equals("TRY", true) } || currentDividends.any { it.currency.equals("TRY", true) }
-        val hasUsd = currentAssets.any { it.currency.equals("USD", true) } || currentTrades.any { it.currency.equals("USD", true) } || currentDividends.any { it.currency.equals("USD", true) }
+        val hasUsd = currentAssets.any { it.currency.equals("USD", true) || it.currency.equals("USDT", true) } || currentTrades.any { it.currency.equals("USD", true) } || currentDividends.any { it.currency.equals("USD", true) }
         fun convert(amount: Double, source: String): Double? {
             if (source.equals(displayCurrency, true)) return amount
             val rate = usdTry?.takeIf { it > 0.0 } ?: return null
@@ -476,16 +476,18 @@ class MainActivity : AppCompatActivity() {
             if ((hasTry && t == null) || (hasUsd && u == null)) return null
             return (t ?: 0.0) + (u ?: 0.0)
         }
-        val marketValue = total { code -> currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
+        fun isCurrency(actual: String, requested: String) =
+            actual.equals(requested, true) || (requested == "USD" && actual.equals("USDT", true))
+        val marketValue = total { code -> currentAssets.filter { isCurrency(it.currency, code) }.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
         val pnl = total { code ->
-            val unrealized = currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.quantity * ((it.lastPrice ?: it.costPrice) - it.costPrice) }
-            val realized = currentTrades.filter { it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
-            val dividends = currentDividends.filter { it.currency.equals(code, true) }.sumOf { it.netAmount }
+            val unrealized = currentAssets.filter { isCurrency(it.currency, code) }.sumOf { it.quantity * ((it.lastPrice ?: it.costPrice) - it.costPrice) }
+            val realized = currentTrades.filter { it.action == "SELL" && isCurrency(it.currency, code) }.sumOf { it.realizedProfit }
+            val dividends = currentDividends.filter { isCurrency(it.currency, code) }.sumOf { it.netAmount }
             unrealized + realized + dividends
         }
         val capital = total { code ->
-            val opening = currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.openingQuantity * it.openingCostPrice }
-            val buys = currentTrades.filter { it.action == "BUY" && it.currency.equals(code, true) }.sumOf { it.quantity * it.unitPrice + it.fee }
+            val opening = currentAssets.filter { isCurrency(it.currency, code) }.sumOf { it.openingQuantity * it.openingCostPrice }
+            val buys = currentTrades.filter { it.action == "BUY" && isCurrency(it.currency, code) }.sumOf { it.quantity * it.unitPrice + it.fee }
             opening + buys
         }
         val percent = if (pnl != null && capital != null && capital > 0.0) pnl / capital * 100.0 else null
@@ -965,8 +967,8 @@ class MainActivity : AppCompatActivity() {
                 addPortfolioChart(container, "Gerçekleşmemiş kâr / zarar", "Ortalama maliyet ile son fiyat farkı • $code",
                     com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR, unrealized, group.map { it.ticker },
                     maxOf(160, group.size * 36 + 20), suffix = if (code == "TRY") " ₺" else " $")
-                val realized = currentTrades.filter { it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
-                val dividends = currentDividends.filter { it.currency.equals(code, true) }.sumOf { it.netAmount }
+                val realized = currentTrades.filter { it.action == "SELL" && isCurrency(it.currency, code) }.sumOf { it.realizedProfit }
+                val dividends = currentDividends.filter { isCurrency(it.currency, code) }.sumOf { it.netAmount }
                 val pnlCard = TextView(this).apply {
                     text = "Gerçekleşmiş satış K/Z: ${currency(realized, code)}\nNet temettü: ${currency(dividends, code)}\nToplam gerçekleşmiş gelir: ${currency(realized + dividends, code)}"
                     textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
@@ -1581,7 +1583,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun parseNumber(raw: String) = raw.trim().replace(" ", "").replace(",", ".").toDoubleOrNull()?.takeIf { it.isFinite() }
     private fun formatNumber(value: Double) = NumberFormat.getNumberInstance(Locale("tr", "TR")).format(value)
-    private fun currency(value: Double, code: String = "TRY") = NumberFormat.getCurrencyInstance(Locale("tr", "TR")).apply { currency = java.util.Currency.getInstance(code.uppercase(Locale.ROOT)) }.format(value)
+    private fun currency(value: Double, code: String = "TRY"): String {
+        val normalized = code.uppercase(Locale.ROOT)
+        val currencyUnit = runCatching { java.util.Currency.getInstance(normalized) }.getOrNull()
+        return if (currencyUnit != null) {
+            NumberFormat.getCurrencyInstance(Locale("tr", "TR")).apply { currency = currencyUnit }.format(value)
+        } else {
+            "$normalized " + NumberFormat.getNumberInstance(Locale("tr", "TR")).format(value)
+        }
+    }
     private fun sourceLabel(source: String) = when(source.uppercase()) { "YAHOO_FINANCE" -> "Yahoo Finance"; "COINGECKO" -> "CoinGecko"; "FRANKFURTER" -> "Frankfurter"; "MANUAL" -> "Elle giriş"; else -> "Otomatik" }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
