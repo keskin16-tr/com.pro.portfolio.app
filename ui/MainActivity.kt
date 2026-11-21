@@ -941,6 +941,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderAnalytics() {
         val container = analyticsContainer ?: return
+        fun isCurrency(actual: String, requested: String) =
+            actual.equals(requested, true) || (requested == "USD" && actual.equals("USDT", true))
         container.removeAllViews()
         val active = currentAssets.filter { it.quantity > 0.0 }
         if (active.isEmpty()) {
@@ -951,7 +953,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         listOf("TRY", "USD").forEach { code ->
-            val group = active.filter { it.currency.equals(code, true) }
+            val group = active.filter { isCurrency(it.currency, code) }
             if (group.isNotEmpty()) {
                 container.addView(TextView(this).apply {
                     text = if (code == "TRY") "TÜRK LİRASI PORTFÖYÜ" else "ABD DOLARI PORTFÖYÜ"
