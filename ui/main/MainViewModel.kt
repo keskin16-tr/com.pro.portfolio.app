@@ -99,7 +99,7 @@ class MainViewModel(application:Application):AndroidViewModel(application){
  fun sellAsset(assetId:Long,quantity:Double,unitPrice:Double,fee:Double,note:String="Satış işlemi",onResult:(Result<Unit>)->Unit){
   viewModelScope.launch{onResult(runCatching{repository.recordSell(assetId,quantity,unitPrice,fee,note)})}
  }
- fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String,quantity:Double?,costPrice:Double?,currency:String,priceSource:String,manualPrice:Double?,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.updateAssetDetails(assetId,name,ticker,category,broker,quantity,costPrice,currency,priceSource,manualPrice)})}}
+ fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String,portfolioName:String,marketSymbol:String,notes:String,quantity:Double?,costPrice:Double?,currency:String,priceSource:String,manualPrice:Double?,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.updateAssetDetails(assetId,name,ticker,category,broker,portfolioName,marketSymbol,notes,quantity,costPrice,currency,priceSource,manualPrice)})}}
  fun editTrade(tradeId:Long,action:String,quantity:Double,unitPrice:Double,fee:Double,note:String,executedAt:Long,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.editTrade(tradeId,action,quantity,unitPrice,fee,note,executedAt)})}}
  fun deleteTrade(tradeId:Long,onResult:(Result<Unit>)->Unit){viewModelScope.launch{onResult(runCatching{repository.deleteTrade(tradeId)})}}
  fun deleteAsset(asset:AssetEntity){viewModelScope.launch{repository.delete(asset)}}
