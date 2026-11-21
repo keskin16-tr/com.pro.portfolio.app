@@ -34,7 +34,6 @@ class PortfolioRepository(private val database: AppDatabase) {
         broker: String = "Belirtilmedi", priceSource: String = "AUTO", manualPrice: Double? = null,
         note: String = "Alış işlemi"
     ) {
-        require(currency.uppercase() in listOf("TRY", "USD")) { "Varlık para birimi yalnızca TRY veya USD olabilir." }
         if (priceSource == "MANUAL") require(manualPrice != null && manualPrice >= 0.0) { "Elle giriş için güncel fiyat girin." }
         require(quantity > 0.0 && unitPrice >= 0.0 && fee >= 0.0)
         database.withTransaction {
@@ -119,7 +118,6 @@ class PortfolioRepository(private val database: AppDatabase) {
         currency: String = "TRY", paymentDate: Long = System.currentTimeMillis(), note: String = "",
         broker: String? = null
     ) {
-        require(currency.uppercase() in listOf("TRY", "USD")) { "Temettü para birimi yalnızca TRY veya USD olabilir." }
         require(grossAmount > 0.0 && taxPercent in 0.0..100.0)
         database.withTransaction {
             val asset = assetDao.getAssetsOnce().firstOrNull {
@@ -148,7 +146,6 @@ class PortfolioRepository(private val database: AppDatabase) {
         database.withTransaction {
             val existing = assetDao.getAssetsOnce().map { it.ticker.uppercase() }.toMutableSet()
             holdings.forEach { row ->
-                require(row.currency.uppercase() in listOf("TRY", "USD")) { "${row.ticker} için para birimi TRY veya USD olmalı." }
                 if (row.ticker.uppercase() in existing) {
                     skipped++
                 } else {
@@ -173,12 +170,6 @@ class PortfolioRepository(private val database: AppDatabase) {
         require(backup.assets.isNotEmpty()) { "Yedekte varlık bulunamadı." }
         val sourceIds = backup.assets.mapNotNull { it.sourceId }
         require(sourceIds.distinct().size == sourceIds.size) { "Varlık ID alanında tekrar eden kayıt bulundu." }
-        require(backup.assets.all { it.currency in listOf("TRY", "USD") }) {
-            "Bu sürümde yalnızca TRY ve USD varlıklar destekleniyor."
-        }
-        require(backup.trades.all { it.currency in listOf("TRY", "USD") }) {
-            "İşlem geçmişinde TRY veya USD dışında para birimi bulundu."
-        }
         var addedAssets = 0
         var skippedAssets = 0
         var addedTrades = 0
@@ -319,8 +310,8 @@ class PortfolioRepository(private val database: AppDatabase) {
                 require(quantity != null && costPrice != null && quantity >= 0.0 && costPrice >= 0.0) {
                     "Miktar ve maliyet geçerli olmalı."
                 }
-                require(trades.isEmpty()) {
-                    "İşlem geçmişi bulunan varlıkların miktar ve maliyeti İşlemler sayfasından düzenlenmelidir."
+                require(trades.none { it.applied }) {
+                    "Uygulanmış işlem geçmişi bulunan varlıkların miktar ve maliyeti İşlemler sayfasından düzenlenmelidir."
                 }
                 assetDao.updateOpeningPosition(assetId, quantity, costPrice)
             }
