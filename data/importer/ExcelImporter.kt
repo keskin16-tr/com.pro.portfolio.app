@@ -99,7 +99,7 @@ object ExcelImporter {
             else {
                 val category = category(v(categoryCol))
                 val account = v(accountCol).ifBlank { "Ana Portföy" }
-                ImportedAsset(v(idCol).toLongOrNull(), ticker, v(nameCol).ifBlank { ticker },
+                ImportedAsset(parseLongId(v(idCol)), ticker, v(nameCol).ifBlank { ticker },
                     category, account, qty, number(v(unitCol)), v(currencyCol).ifBlank { if (category == "US_STOCK") "USD" else "TRY" }.uppercase(Locale.ROOT),
                     cost, v(brokerCol).ifBlank { account }, priceSource(v(sourceCol)),
                     marketSymbol.ifBlank { defaultMarketSymbol(ticker, category) },
@@ -147,7 +147,7 @@ object ExcelImporter {
             val ticker = v(tickerCol).ifBlank {
                 if (action == "DIVIDEND" && v(assetIdCol).isBlank()) note else v(assetNameCol)
             }.uppercase(Locale.ROOT)
-            ImportedTrade(v(idCol).toLongOrNull(), v(assetIdCol).toLongOrNull(), ticker, action,
+            ImportedTrade(parseLongId(v(idCol)), parseLongId(v(assetIdCol)), ticker, action,
                 rawQty, rawPrice, number(v(feeCol)) ?: 0.0, v(currencyCol).ifBlank { "TRY" }.uppercase(Locale.ROOT),
                 date, note, number(v(realizedCol)), v(appliedCol).let { it.isBlank() || normalize(it) in setOf("TRUE", "1", "YES", "EVET", "UYGULANDI") },
                 parseDate(v(createdCol)), number(v(realizedTryCol)))
@@ -233,6 +233,10 @@ object ExcelImporter {
     private fun normalize(v: String) = v.trim().uppercase(Locale("tr", "TR"))
         .replace("İ", "I").replace("Ş", "S").replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C")
         .replace(Regex("[^A-Z0-9]"), "")
+    private fun parseLongId(raw: String): Long? {
+        val value = raw.trim()
+        return value.toLongOrNull() ?: value.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 && it % 1.0 == 0.0 }?.toLong()
+    }
     private fun number(raw: String): Double? {
         val s = raw.trim().replace(" ", "")
         val normalized = if (s.contains(",") && s.contains(".")) {
