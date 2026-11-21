@@ -336,32 +336,37 @@ class PortfolioRepository(private val database: AppDatabase) {
     }
 
     suspend fun editTrade(
-        tradeId: Long, action: String, quantity: Double, unitPrice: Double,
+        tradeId: Long, newAssetId: Long, action: String, quantity: Double, unitPrice: Double,
         fee: Double, note: String, executedAt: Long
     ) {
         require(action in setOf("BUY", "SELL", "CASH_IN", "CASH_OUT", "TRANSFER", "DIVIDEND"))
         require(quantity > 0.0 && unitPrice >= 0.0 && fee >= 0.0)
         database.withTransaction {
             val current = tradeDao.getById(tradeId) ?: error("İşlem bulunamadı")
-            val asset = assetDao.getById(current.assetId) ?: error("Varlık bulunamadı")
+            val oldAssetId = current.assetId
+            val asset = assetDao.getById(newAssetId) ?: error("Seçilen varlık bulunamadı")
+            if (action == "DIVIDEND") require(fee <= quantity * unitPrice) {
+                "Stopaj brüt temettü tutarını aşmamalı."
+            }
             tradeDao.update(current.copy(
+                assetId = newAssetId, currency = asset.currency,
                 action = action, quantity = quantity, unitPrice = unitPrice, fee = fee,
                 note = note, executedAt = executedAt
             ))
+            val existingDividend = dividendDao.getByTradeId(tradeId)
             if (action == "DIVIDEND") {
-                require(fee <= quantity * unitPrice) { "Stopaj brüt temettü tutarını aşmamalı." }
-                val existingDividend = dividendDao.getByTradeId(tradeId)
                 val updated = DividendEntity(
-                    id = existingDividend?.id ?: 0L, assetId = current.assetId, ticker = asset.ticker,
+                    id = existingDividend?.id ?: 0L, assetId = newAssetId, ticker = asset.ticker,
                     quantityAtPayment = asset.quantity, grossAmount = quantity * unitPrice, withholdingTax = fee,
-                    netAmount = quantity * unitPrice - fee, currency = current.currency, exDate = executedAt,
+                    netAmount = quantity * unitPrice - fee, currency = asset.currency, exDate = executedAt,
                     paymentDate = executedAt, note = note, tradeId = tradeId
                 )
                 if (existingDividend == null) dividendDao.insert(updated) else dividendDao.update(updated)
-            } else {
-                if (current.action == "DIVIDEND") dividendDao.getByTradeId(tradeId)?.let { dividendDao.delete(it) }
-                recalculateAsset(current.assetId)
+            } else if (existingDividend != null) {
+                dividendDao.delete(existingDividend)
             }
+            recalculateAsset(oldAssetId)
+            if (newAssetId != oldAssetId) recalculateAsset(newAssetId)
         }
     }
 
