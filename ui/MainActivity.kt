@@ -1418,18 +1418,19 @@ class MainActivity : AppCompatActivity() {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(8), dp(22), 0) }
         fun field(hint: String, value: String) = android.widget.EditText(this).apply { this.hint = hint; setText(value); isSingleLine = true }
         val name = field("Varlık adı", asset.name)
-        val ticker = field("Sembol", asset.ticker)
+        val ticker = field("Görünen sembol", asset.ticker)
         val categories = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "BANK", "CASH", "OTHER")
         val labels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Banka", "Nakit", "Diğer")
         val category = android.widget.Spinner(this).apply { adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels); setSelection(categories.indexOf(asset.category).coerceAtLeast(0)) }
         val broker = field("Aracı kurum", asset.broker)
         val portfolioName = field("Portföy / hesap adı", asset.portfolioName)
-        val marketSymbol = field("Piyasa veri sembolü / sorgu terimi", asset.marketSymbol)
+        val marketSymbol = field("Veri sağlayıcı sembolü / sorgu terimi", asset.marketSymbol)
         val notes = field("Notlar", asset.notes)
-        val currencyCodes = listOf("TRY", "USD")
+        val currencyCodes = listOf("TRY", "USD", "USDT", "EUR", "GBP", "JPY", "RUB")
+        val currencyLabels = listOf("Türk Lirası (TRY)", "ABD Doları (USD)", "Tether (USDT)", "Euro (EUR)", "İngiliz Sterlini (GBP)", "Japon Yeni (JPY)", "Rus Rublesi (RUB)")
         val currencySpinner = android.widget.Spinner(this).apply {
-            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Türk Lirası (TRY)", "ABD Doları (USD)"))
-            setSelection(if (asset.currency == "USD") 1 else 0)
+            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, currencyLabels)
+            setSelection(currencyCodes.indexOf(asset.currency.uppercase()).coerceAtLeast(0))
             isEnabled = currentTrades.none { it.assetId == asset.id }
         }
         val sourceCodes = listOf("AUTO", "YAHOO_FINANCE", "COINGECKO", "FRANKFURTER", "MANUAL")
@@ -1469,7 +1470,7 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("İptal", null).setPositiveButton("Kaydet") { _, _ ->
                 val newName = name.text.toString().trim(); val newTicker = ticker.text.toString().trim().uppercase(Locale.ROOT)
                 val newBroker = broker.text.toString().trim().ifBlank { "Belirtilmedi" }
-                if (newName.isBlank() || newTicker.isBlank()) Toast.makeText(this, "Ad ve sembol boş olamaz.", Toast.LENGTH_LONG).show()
+                if (newName.isBlank()) Toast.makeText(this, "Varlık adı boş olamaz.", Toast.LENGTH_LONG).show()
                 else {
                     val newQuantity = if (hasTrades) null else parseNumber(quantity.text.toString())
                     val newCost = if (hasTrades) null else parseNumber(cost.text.toString())
