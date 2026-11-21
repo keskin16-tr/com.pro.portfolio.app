@@ -14,7 +14,7 @@ interface AssetDao {
  @Query("UPDATE assets SET quantity=:quantity, costPrice=:costPrice WHERE id=:assetId") suspend fun updatePosition(assetId:Long,quantity:Double,costPrice:Double)
  @Query("UPDATE assets SET lastPrice=:price, priceUpdatedAt=:updatedAt WHERE id=:assetId") suspend fun updatePrice(assetId:Long,price:Double,updatedAt:Long)
  @Query("SELECT * FROM assets WHERE id=:assetId LIMIT 1") suspend fun getById(assetId:Long):AssetEntity?
- @Query("UPDATE assets SET category=:category, broker=:broker WHERE id=:assetId") suspend fun updateClassification(assetId:Long,category:String,broker:String)
+ @Query("UPDATE assets SET category=:category, broker=:broker, portfolioName=:broker WHERE id=:assetId") suspend fun updateClassification(assetId:Long,category:String,broker:String)
  @Query("UPDATE assets SET name=:name, ticker=:ticker, category=:category, broker=:broker, portfolioName=:portfolioName, marketSymbol=:marketSymbol, currency=:currency, priceSource=:priceSource, notes=:notes WHERE id=:assetId")
  suspend fun updateAssetDetails(assetId:Long,name:String,ticker:String,category:String,broker:String,portfolioName:String,marketSymbol:String,currency:String,priceSource:String,notes:String)
  @Query("UPDATE assets SET quantity=:quantity, costPrice=:costPrice, openingQuantity=:quantity, openingCostPrice=:costPrice WHERE id=:assetId")
