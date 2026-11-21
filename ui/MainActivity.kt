@@ -1423,6 +1423,9 @@ class MainActivity : AppCompatActivity() {
         val labels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Banka", "Nakit", "Diğer")
         val category = android.widget.Spinner(this).apply { adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels); setSelection(categories.indexOf(asset.category).coerceAtLeast(0)) }
         val broker = field("Aracı kurum", asset.broker)
+        val portfolioName = field("Portföy / hesap adı", asset.portfolioName)
+        val marketSymbol = field("Piyasa veri sembolü / sorgu terimi", asset.marketSymbol)
+        val notes = field("Notlar", asset.notes)
         val currencyCodes = listOf("TRY", "USD")
         val currencySpinner = android.widget.Spinner(this).apply {
             adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Türk Lirası (TRY)", "ABD Doları (USD)"))
@@ -1447,9 +1450,10 @@ class MainActivity : AppCompatActivity() {
         val hasTrades = currentTrades.any { it.assetId == asset.id }
         val quantity = if (!hasTrades) field("Miktar", asset.quantity.toString()) else null
         val cost = if (!hasTrades) field("Ortalama maliyet", asset.costPrice.toString()) else null
-        box.addView(name); box.addView(ticker)
+        box.addView(name); box.addView(ticker); box.addView(marketSymbol)
+        box.addView(portfolioName); box.addView(broker); box.addView(notes)
         box.addView(TextView(this).apply { text = "Kategori"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, 0) })
-        box.addView(category); box.addView(broker)
+        box.addView(category)
         box.addView(TextView(this).apply { text = "Para birimi"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, 0) })
         box.addView(currencySpinner)
         box.addView(TextView(this).apply { text = "Fiyat veri kaynağı"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, 0) })
@@ -1481,7 +1485,7 @@ class MainActivity : AppCompatActivity() {
                         Toast.makeText(this, "Elle giriş için geçerli güncel fiyat girin.", Toast.LENGTH_LONG).show()
                         return@setPositiveButton
                     }
-                    viewModel.updateAssetDetails(asset.id, newName, newTicker, categories[category.selectedItemPosition], newBroker, newQuantity, newCost, currencyCode, provider, manual) { result -> runOnUiThread {
+                    viewModel.updateAssetDetails(asset.id, newName, newTicker, categories[category.selectedItemPosition], newBroker, portfolioName.text.toString(), marketSymbol.text.toString(), notes.text.toString(), newQuantity, newCost, currencyCode, provider, manual) { result -> runOnUiThread {
                     result.onSuccess { Toast.makeText(this, "Varlık bilgileri güncellendi.", Toast.LENGTH_SHORT).show() }
                         .onFailure { Toast.makeText(this, it.message ?: "Varlık güncellenemedi.", Toast.LENGTH_LONG).show() }
                 } }
