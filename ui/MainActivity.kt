@@ -1448,7 +1448,7 @@ class MainActivity : AppCompatActivity() {
                 manualPrice.isEnabled = sourceCodes[position] == "MANUAL"
             }
         }
-        val hasTrades = currentTrades.any { it.assetId == asset.id }
+        val hasTrades = currentTrades.any { it.assetId == asset.id && it.applied }
         val quantity = field("Miktar", asset.quantity.toString()).apply { isEnabled = !hasTrades }
         val cost = field("Ortalama maliyet", asset.costPrice.toString()).apply { isEnabled = !hasTrades }
         box.addView(name); box.addView(ticker); box.addView(marketSymbol)
