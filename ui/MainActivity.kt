@@ -1530,7 +1530,6 @@ class MainActivity : AppCompatActivity() {
         val fee = field(if (trade.action == "DIVIDEND") "Toplam stopaj tutarı" else "Komisyon", trade.fee.toString())
         val note = android.widget.EditText(this).apply { hint = "Not"; setText(trade.note); isSingleLine = true; inputType = android.text.InputType.TYPE_CLASS_TEXT }
         box.addView(TextView(this).apply { text = "İşlem türü"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)) })
-        box.addView(TextView(this).apply { text = "İşlem türü"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)) })
         box.addView(action)
         box.addView(TextView(this).apply { text = "Varlık / hesap"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, dp(2)) })
         box.addView(assetSpinner)
@@ -1539,18 +1538,20 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("İptal", null).setPositiveButton("Kaydet") { _, _ ->
                 val qty = parseNumber(quantity.text.toString()); val unitPrice = parseNumber(price.text.toString()); val commission = parseNumber(fee.text.toString()) ?: 0.0
                 if (qty == null || qty <= 0.0 || unitPrice == null || unitPrice < 0.0 || commission < 0.0) Toast.makeText(this, "Miktar, fiyat ve komisyon değerlerini kontrol edin.", Toast.LENGTH_LONG).show()
-                else if (trade.action == "DIVIDEND" && commission > qty * unitPrice) Toast.makeText(this, "Stopaj brüt temettü tutarından yüksek olamaz.", Toast.LENGTH_LONG).show()
-                 else {
+                else if (actionCodes[action.selectedItemPosition] == "DIVIDEND" && commission > qty * unitPrice) Toast.makeText(this, "Stopaj brüt temettü tutarından yüksek olamaz.", Toast.LENGTH_LONG).show()
+                else {
                     val selectedAsset = selectableAssets.getOrNull(assetSpinner.selectedItemPosition)
                     if (selectedAsset == null) {
                         Toast.makeText(this, "Bir varlık seçin.", Toast.LENGTH_LONG).show()
                         return@setPositiveButton
                     }
-                    viewModel.editTrade(trade.id, selectedAsset.id, actionCodes[action.selectedItemPosition], qty, unitPrice, commission, note.text.toString(), executedAt)
-                } { result -> runOnUiThread {
-                    result.onSuccess { Toast.makeText(this, "İşlem güncellendi; portföy ve kâr/zarar yeniden hesaplandı.", Toast.LENGTH_LONG).show() }
-                        .onFailure { Toast.makeText(this, it.message ?: "İşlem güncellenemedi.", Toast.LENGTH_LONG).show() }
-                } }
+                    viewModel.editTrade(trade.id, selectedAsset.id, actionCodes[action.selectedItemPosition], qty, unitPrice, commission, note.text.toString(), executedAt) { result ->
+                        runOnUiThread {
+                            result.onSuccess { Toast.makeText(this, "İşlem güncellendi; portföy ve kâr/zarar yeniden hesaplandı.", Toast.LENGTH_LONG).show() }
+                                .onFailure { Toast.makeText(this, it.message ?: "İşlem güncellenemedi.", Toast.LENGTH_LONG).show() }
+                        }
+                    }
+                }
             }.show()
     }
 
