@@ -304,8 +304,8 @@ class PortfolioRepository(private val database: AppDatabase) {
         quantity: Double? = null, costPrice: Double? = null, currency: String = "TRY",
         priceSource: String = "AUTO", manualPrice: Double? = null
     ) {
-        require(currency.uppercase() in listOf("TRY", "USD")) { "Varlık para birimi yalnızca TRY veya USD olabilir." }
-        require(name.isNotBlank() && ticker.isNotBlank() && category.isNotBlank() && broker.isNotBlank())
+        require(currency.isNotBlank()) { "Varlık para birimi boş olamaz." }
+        require(name.isNotBlank() && category.isNotBlank() && broker.isNotBlank())
         database.withTransaction {
             val existing = assetDao.getById(assetId) ?: error("Varlık bulunamadı")
             val trades = tradeDao.getForAssetOnce(assetId)
@@ -327,7 +327,7 @@ class PortfolioRepository(private val database: AppDatabase) {
             val cleanTicker = ticker.trim().uppercase()
             assetDao.updateAssetDetails(
                 assetId, name.trim(), cleanTicker, category, broker, portfolioName.trim().ifBlank { "Ana Portföy" },
-                marketSymbol.trim().ifBlank { defaultMarketSymbol(cleanTicker, category) }, currency, priceSource, notes.trim()
+                marketSymbol.trim(), currency, priceSource, notes.trim()
             )
             if (priceSource == "MANUAL" && manualPrice != null) {
                 assetDao.updatePrice(assetId, manualPrice, System.currentTimeMillis())
