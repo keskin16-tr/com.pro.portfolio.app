@@ -1159,13 +1159,6 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(22), dp(8), dp(22), 0)
         }
-        val tradeMetaDate = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
-        box.addView(TextView(this).apply {
-            text = "İşlem ID: ${trade.id}  •  Varlık ID: ${trade.assetId}  •  Para birimi: ${trade.currency}\nKayıt tarihi: ${trade.createdAt?.let { tradeMetaDate.format(Date(it)) } ?: "—"}  •  Bakiye durumu: ${if (trade.applied) "Uygulandı" else "Yalnızca geçmiş kaydı"}\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}  •  TRY karşılığı: ${currency(trade.realizedProfitTry, "TRY")}"
-            textSize = 11f
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
-            setPadding(0, 0, 0, dp(8))
-        })
         val actionCodes = listOf("BUY", "SELL", "CASH_IN", "CASH_OUT", "TRANSFER", "DIVIDEND")
         val actionLabels = listOf("Alış", "Satış", "Para Girişi", "Para Çıkışı", "Transfer", "Temettü")
         val typeSpinner = android.widget.Spinner(this).apply {
@@ -1512,6 +1505,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun showEditTradeDialog(trade: TradeEntity) {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(8), dp(22), 0) }
+        val tradeMetaDate = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
+        box.addView(TextView(this).apply {
+            text = "İşlem ID: ${trade.id}  •  Varlık ID: ${trade.assetId}  •  Para birimi: ${trade.currency}\nKayıt tarihi: ${trade.createdAt?.let { tradeMetaDate.format(Date(it)) } ?: "—"}  •  Bakiye durumu: ${if (trade.applied) "Uygulandı" else "Yalnızca geçmiş kaydı"}\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}  •  TRY karşılığı: ${currency(trade.realizedProfitTry, "TRY")}"
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            setPadding(0, 0, 0, dp(8))
+        })
         val actionCodes = listOf("BUY", "SELL", "CASH_IN", "CASH_OUT", "TRANSFER", "DIVIDEND")
         val action = android.widget.Spinner(this).apply {
             adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Alış", "Satış", "Para Girişi", "Para Çıkışı", "Transfer", "Temettü"))
