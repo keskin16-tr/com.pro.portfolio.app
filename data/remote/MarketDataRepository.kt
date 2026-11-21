@@ -11,8 +11,12 @@ class MarketDataRepository {
         when(asset.priceSource.uppercase()) {
             "MANUAL" -> null
             "YAHOO_FINANCE" -> runCatching {
-                if (asset.category.equals("FX", true) || asset.ticker.uppercase() in setOf("USD", "EUR", "GBP", "JPY", "RUB")) fetchYahoo(asset, true)
-                else fetchYahoo(asset)
+                when {
+                    asset.category.equals("FX", true) || asset.ticker.uppercase() in setOf("USD", "EUR", "GBP", "JPY", "RUB") -> fetchYahoo(asset, true)
+                    asset.category.equals("CRYPTO", true) && asset.marketSymbol.contains("/") -> fetchCrypto(asset)
+                    asset.category.equals("COMMODITY", true) || asset.category.equals("GOLD", true) -> fetchMetal(asset)
+                    else -> fetchYahoo(asset)
+                }
             }.getOrNull()
             "COINGECKO" -> runCatching { fetchCrypto(asset) }.getOrNull()
             "FRANKFURTER" -> runCatching { fetchFx(asset) }.getOrNull()
@@ -20,6 +24,7 @@ class MarketDataRepository {
                 when(asset.category.uppercase()) {
                     "CRYPTO","KRIPTO" -> fetchCrypto(asset)
                     "FX","DOVIZ","DÖVİZ" -> fetchFx(asset)
+                    "COMMODITY","GOLD" -> fetchMetal(asset)
                     else -> fetchYahoo(asset)
                 }
             }.getOrNull()
@@ -41,6 +46,25 @@ class MarketDataRepository {
         val quoteCurrency=meta.currency?:asset.currency
         if(!quoteCurrency.equals(asset.currency,true)) return null
         return PriceQuote(symbol,price,quoteCurrency,"Yahoo Finance")
+    }
+
+    private suspend fun fetchMetal(asset:AssetEntity):PriceQuote? {
+        val metalText = (asset.ticker + " " + asset.name).uppercase()
+        val silver = metalText.contains("AG") || metalText.contains("GUMUS") || metalText.contains("SILVER")
+        val symbol = if (silver) "SI=F" else "GC=F"
+        val metalMeta = YahooFinanceApiService.instance.getStockPrice(symbol).chart?.result?.firstOrNull()?.meta ?: return null
+        val ouncePrice = metalMeta.regularMarketPrice ?: return null
+        val quoteCurrency = metalMeta.currency ?: "USD"
+        val gramPrice = ouncePrice / 31.1034768
+        val finalPrice = when (asset.currency.uppercase()) {
+            "USD", "USDT" -> gramPrice
+            "TRY" -> {
+                val fxMeta = YahooFinanceApiService.instance.getStockPrice("USDTRY=X").chart?.result?.firstOrNull()?.meta ?: return null
+                gramPrice * (fxMeta.regularMarketPrice ?: return null)
+            }
+            else -> return null
+        }
+        return PriceQuote(asset.marketSymbol.ifBlank { symbol }, finalPrice, asset.currency, "Yahoo Finance")
     }
 
     private suspend fun fetchCrypto(asset:AssetEntity):PriceQuote? {
