@@ -45,7 +45,7 @@ class PortfolioRepository(private val database: AppDatabase) {
             val assetId = existing?.id ?: assetDao.insertAsset(
                 AssetEntity(
                     name = name.trim(), ticker = ticker.trim().uppercase(), quantity = 0.0, costPrice = 0.0,
-                    category = category, currency = currency, marketSymbol = defaultMarketSymbol(ticker, category),
+                    category = category, portfolioName = broker, currency = currency, marketSymbol = defaultMarketSymbol(ticker, category),
                     broker = broker, lastPrice = if (priceSource == "MANUAL") manualPrice else unitPrice, priceUpdatedAt = System.currentTimeMillis(), priceSource = priceSource
                 )
             )
