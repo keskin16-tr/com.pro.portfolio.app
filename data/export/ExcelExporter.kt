@@ -65,7 +65,7 @@ object ExcelExporter {
             assets.forEach { asset ->
                 assetRows += listOf(
                     asset.id, asset.name, asset.ticker, categoryLabel(asset.category),
-                    asset.broker, asset.quantity, asset.lastPrice ?: asset.costPrice,
+                    asset.portfolioName, asset.quantity, asset.lastPrice ?: asset.costPrice,
                     asset.currency, asset.costPrice, asset.notes,
                     asset.createdAt?.let { dateFormat.format(Date(it)) },
                     asset.updatedAt?.let { dateFormat.format(Date(it)) },
