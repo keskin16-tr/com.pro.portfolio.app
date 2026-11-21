@@ -69,27 +69,28 @@ object ExcelImporter {
     }
 
     private fun parseAssets(rows: List<List<String>>): List<ImportedAsset> {
-        val h = headers(rows)
+        val headerIndex = findHeaderRow(rows, setOf("NAME", "SYMBOL", "TICKER", "VARLIK", "VARLIKADI"))
+        val h = headers(rows[headerIndex])
         fun col(vararg names: String) = findColumn(h, *names)
-        val tickerCol = col("symbol", "ticker", "sembol", "hisse kodu", "kod")
+        val tickerCol = col("symbol", "ticker", "sembol", "hisse kodu", "kod", "görünen sembol", "gorunen sembol")
             ?: error("Varlıklar sayfasında symbol/ticker sütunu bulunamadı.")
         val qtyCol = col("quantity", "qty", "adet", "miktar")
             ?: error("Varlıklar sayfasında quantity sütunu bulunamadı.")
         val costCol = col("cost_per_unit", "costprice", "average cost", "ortalama maliyet", "maliyet", "alış fiyatı")
             ?: error("Varlıklar sayfasında cost_per_unit/ortalama maliyet sütunu bulunamadı.")
         val idCol = col("id", "varlık id", "asset id")
-        val nameCol = col("name", "varlık", "varlık adı", "ad")
+        val nameCol = col("name", "varlık", "varlık adı", "ad", "asset name", "ürün adı", "varlik adi")
         val categoryCol = col("category", "kategori", "tür", "tip")
         val accountCol = col("account", "portfolio", "portföy", "hesap")
         val unitCol = col("unit_price", "lastprice", "last price", "son fiyat", "güncel fiyat", "price")
         val currencyCol = col("currency", "para birimi")
         val brokerCol = col("broker", "aracı kurum", "kurum")
         val sourceCol = col("price_source", "price source", "fiyat kaynağı")
-        val marketCol = col("market_symbol", "market symbol")
+        val marketCol = col("market_symbol", "market symbol", "veri sembolü", "veri sembolu", "piyasa sembolü", "piyasa sembolu", "sorgu sembolü", "sorgu sembolu")
         val notesCol = col("notes", "note", "not", "açıklama")
         val createdCol = col("created_at", "created at", "oluşturulma tarihi")
         val updatedCol = col("updated_at", "updated at", "güncelleme tarihi")
-        return rows.drop(1).mapNotNull { row ->
+        return rows.drop(headerIndex + 1).mapNotNull { row ->
             fun v(i: Int?) = i?.let { row.getOrNull(it).orEmpty().trim() }.orEmpty()
             val marketSymbol = v(marketCol)
             val fallbackSymbol = marketSymbol.takeIf { it.any { ch -> ch.isLetterOrDigit() } }.orEmpty()
@@ -109,7 +110,8 @@ object ExcelImporter {
     }
 
     private fun parseTrades(rows: List<List<String>>): List<ImportedTrade> {
-        val h = headers(rows)
+        val headerIndex = findHeaderRow(rows, setOf("TRANSACTIONTYPE", "ISLEM", "ISLEMTURU", "ACTION", "TYPE"))
+        val h = headers(rows[headerIndex])
         fun col(vararg names: String) = findColumn(h, *names)
         val actionCol = col("transaction_type", "transaction type", "işlem", "işlem türü", "type", "action")
             ?: error("İşlemler sayfasında transaction_type/İşlem sütunu bulunamadı.")
@@ -127,7 +129,7 @@ object ExcelImporter {
         val appliedCol = col("applied", "uygulandı", "aktif")
         val createdCol = col("created_at", "created at", "oluşturulma tarihi")
         val realizedTryCol = col("realized_pnl_try", "realized pnl try", "gerçekleşen k/z try")
-        return rows.drop(1).mapNotNull { row ->
+        return rows.drop(headerIndex + 1).mapNotNull { row ->
             fun v(i: Int?) = i?.let { row.getOrNull(it).orEmpty().trim() }.orEmpty()
             val action = when (normalize(v(actionCol))) {
                 "BUY", "ALIS", "AL" -> "BUY"
@@ -154,7 +156,12 @@ object ExcelImporter {
         }
     }
 
-    private fun headers(rows: List<List<String>>) = rows.firstOrNull().orEmpty().mapIndexed { i, v -> normalize(v) to i }.toMap()
+    private fun findHeaderRow(rows: List<List<String>>, markers: Set<String>): Int {
+        val index = rows.indexOfFirst { row -> row.map(::normalize).any { it in markers } }
+        if (index < 0) error("Excel sayfasında sütun başlıkları bulunamadı.")
+        return index
+    }
+    private fun headers(row: List<String>) = row.mapIndexed { i, v -> normalize(v) to i }.toMap()
     private fun findColumn(h: Map<String, Int>, vararg names: String): Int? = names.firstNotNullOfOrNull { h[normalize(it)] }
     private fun resolveSheets(workbook: ByteArray?, relationships: ByteArray?): List<Pair<String, String>> {
         if (workbook == null || relationships == null) return emptyList()
