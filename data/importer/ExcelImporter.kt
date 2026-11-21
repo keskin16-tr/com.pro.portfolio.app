@@ -100,7 +100,7 @@ object ExcelImporter {
             fun v(i: Int?) = i?.let { row.getOrNull(it).orEmpty().trim() }.orEmpty()
             val marketSymbol = v(marketCol)
             val fallbackSymbol = marketSymbol.takeIf { it.any { ch -> ch.isLetterOrDigit() } }.orEmpty()
-            val ticker = v(tickerCol).ifBlank { fallbackSymbol }.ifBlank { v(nameCol) }.uppercase(Locale.ROOT)
+            val ticker = v(tickerCol).uppercase(Locale.ROOT)
             val qty = number(v(qtyCol)); val cost = number(v(costCol))
             if (ticker.isBlank() || qty == null || qty < 0.0 || cost == null || cost < 0.0) null
             else {
@@ -109,7 +109,7 @@ object ExcelImporter {
                 ImportedAsset(parseLongId(v(idCol)), ticker, v(nameCol).ifBlank { ticker },
                     category, account, qty, number(v(unitCol)), v(currencyCol).ifBlank { if (category == "US_STOCK") "USD" else "TRY" }.uppercase(Locale.ROOT),
                     cost, v(brokerCol).ifBlank { account }, priceSource(v(sourceCol)),
-                    marketSymbol.ifBlank { defaultMarketSymbol(ticker, category) },
+                    marketSymbol,
                     v(notesCol), parseDate(v(createdCol)), parseDate(v(updatedCol)))
             }
         }
@@ -281,8 +281,8 @@ object ExcelImporter {
         else -> "OTHER"
     }
     private fun priceSource(v: String) = when (normalize(v)) {
-        "YAHOOFINANCE", "YAHOO" -> "YAHOO_FINANCE"
-        "COINGECKO" -> "COINGECKO"
+        "YAHOOFINANCE", "YAHOO", "YFINANCE" -> "YAHOO_FINANCE"
+        "COINGECKO", "CRYPTO" -> "COINGECKO"
         "FRANKFURTER" -> "FRANKFURTER"
         "MANUEL", "ELLEGIRIS" -> "MANUAL"
         else -> "AUTO"
