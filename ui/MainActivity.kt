@@ -1437,19 +1437,19 @@ class MainActivity : AppCompatActivity() {
             adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Otomatik", "Yahoo Finance", "CoinGecko", "Frankfurter", "Elle giriş"))
             setSelection(sourceCodes.indexOf(asset.priceSource).coerceAtLeast(0))
         }
-        val manualPrice = field("Elle girilecek güncel fiyat", (asset.lastPrice ?: asset.costPrice).toString()).apply {
+        val manualPrice = field("Güncel fiyat (elle kaynak seçilirse düzenlenir)", (asset.lastPrice ?: asset.costPrice).toString()).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            visibility = if (asset.priceSource == "MANUAL") View.VISIBLE else View.GONE
+            isEnabled = asset.priceSource == "MANUAL"
         }
         sourceSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                manualPrice.visibility = if (sourceCodes[position] == "MANUAL") View.VISIBLE else View.GONE
+                manualPrice.isEnabled = sourceCodes[position] == "MANUAL"
             }
         }
         val hasTrades = currentTrades.any { it.assetId == asset.id }
-        val quantity = if (!hasTrades) field("Miktar", asset.quantity.toString()) else null
-        val cost = if (!hasTrades) field("Ortalama maliyet", asset.costPrice.toString()) else null
+        val quantity = field("Miktar", asset.quantity.toString()).apply { isEnabled = !hasTrades }
+        val cost = field("Ortalama maliyet", asset.costPrice.toString()).apply { isEnabled = !hasTrades }
         box.addView(name); box.addView(ticker); box.addView(marketSymbol)
         box.addView(portfolioName); box.addView(broker); box.addView(notes)
         box.addView(TextView(this).apply { text = "Kategori"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, 0) })
@@ -1464,7 +1464,7 @@ class MainActivity : AppCompatActivity() {
                 textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(10), 0, 0)
             })
         } else {
-            quantity?.let { box.addView(it) }; cost?.let { box.addView(it) }
+            box.addView(quantity); box.addView(cost)
         }
         androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Varlığı düzenle").setView(box)
             .setNegativeButton("İptal", null).setPositiveButton("Kaydet") { _, _ ->
@@ -1472,8 +1472,8 @@ class MainActivity : AppCompatActivity() {
                 val newBroker = broker.text.toString().trim().ifBlank { "Belirtilmedi" }
                 if (newName.isBlank() || newTicker.isBlank()) Toast.makeText(this, "Ad ve sembol boş olamaz.", Toast.LENGTH_LONG).show()
                 else {
-                    val newQuantity = quantity?.let { parseNumber(it.text.toString()) }
-                    val newCost = cost?.let { parseNumber(it.text.toString()) }
+                    val newQuantity = if (hasTrades) null else parseNumber(quantity.text.toString())
+                    val newCost = if (hasTrades) null else parseNumber(cost.text.toString())
                     if (!hasTrades && (newQuantity == null || newQuantity < 0.0 || newCost == null || newCost < 0.0)) {
                         Toast.makeText(this, "Miktar ve ortalama maliyeti kontrol edin.", Toast.LENGTH_LONG).show()
                         return@setPositiveButton
