@@ -318,7 +318,7 @@ class PortfolioRepository(private val database: AppDatabase) {
             val cleanTicker = ticker.trim().uppercase()
             assetDao.updateAssetDetails(
                 assetId, name.trim(), cleanTicker, category, broker, portfolioName.trim().ifBlank { "Ana Portföy" },
-                marketSymbol.trim(), currency, priceSource, notes.trim()
+                marketSymbol.trim(), currency, priceSource, notes.trim(), System.currentTimeMillis()
             )
             if (priceSource == "MANUAL" && manualPrice != null) {
                 assetDao.updatePrice(assetId, manualPrice, System.currentTimeMillis())
