@@ -298,6 +298,7 @@ class PortfolioRepository(private val database: AppDatabase) {
 
     suspend fun updateAssetDetails(
         assetId: Long, name: String, ticker: String, category: String, broker: String,
+        portfolioName: String, marketSymbol: String, notes: String,
         quantity: Double? = null, costPrice: Double? = null, currency: String = "TRY",
         priceSource: String = "AUTO", manualPrice: Double? = null
     ) {
@@ -323,8 +324,8 @@ class PortfolioRepository(private val database: AppDatabase) {
             }
             val cleanTicker = ticker.trim().uppercase()
             assetDao.updateAssetDetails(
-                assetId, name.trim(), cleanTicker, category, broker,
-                defaultMarketSymbol(cleanTicker, category), currency, priceSource
+                assetId, name.trim(), cleanTicker, category, broker, portfolioName.trim().ifBlank { "Ana Portföy" },
+                marketSymbol.trim().ifBlank { defaultMarketSymbol(cleanTicker, category) }, currency, priceSource, notes.trim()
             )
             if (priceSource == "MANUAL" && manualPrice != null) {
                 assetDao.updatePrice(assetId, manualPrice, System.currentTimeMillis())
