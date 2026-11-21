@@ -1458,13 +1458,12 @@ class MainActivity : AppCompatActivity() {
         box.addView(currencySpinner)
         box.addView(TextView(this).apply { text = "Fiyat veri kaynağı"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, 0) })
         box.addView(sourceSpinner); box.addView(manualPrice)
+        box.addView(quantity); box.addView(cost)
         if (hasTrades) {
             box.addView(TextView(this).apply {
-                text = "Bu varlığın işlem geçmişi var. Miktar ve ortalama maliyet, İşlemler sayfasındaki alış/satış kayıtları düzenlenerek otomatik hesaplanır."
+                text = "İşlem geçmişi bulunduğu için miktar ve ortalama maliyet otomatik hesaplanır; bu alanlar yalnızca görüntülenir. Değişiklik için ilgili alış/satış işlemini düzenleyin."
                 textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(10), 0, 0)
             })
-        } else {
-            box.addView(quantity); box.addView(cost)
         }
         androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Varlığı düzenle").setView(box)
             .setNegativeButton("İptal", null).setPositiveButton("Kaydet") { _, _ ->
