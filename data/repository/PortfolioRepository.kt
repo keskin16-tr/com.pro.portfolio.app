@@ -250,13 +250,15 @@ class PortfolioRepository(private val database: AppDatabase) {
             backup.trades.sortedBy { it.executedAt }.forEach { item ->
                 val sourceAsset = backup.assets.firstOrNull { asset ->
                     (item.sourceAssetId != null && asset.sourceId == item.sourceAssetId) ||
-                        asset.ticker.equals(item.ticker, true)
+                        asset.ticker.equals(item.ticker, true) ||
+                        asset.name.equals(item.ticker, true)
                 }
                 val mappedId = item.sourceAssetId?.let { sourceToLocal[it] }
                     ?: sourceAsset?.sourceId?.let { sourceToLocal[it] }
                 val asset = mappedId?.let { assetDao.getById(it) }
                     ?: assetDao.getAssetsOnce().firstOrNull {
-                        it.ticker.equals(item.ticker, true) && it.currency.equals(item.currency, true) &&
+                        (it.ticker.equals(item.ticker, true) || it.name.equals(item.ticker, true)) &&
+                            it.currency.equals(item.currency, true) &&
                             (sourceAsset == null || it.broker.equals(sourceAsset.broker, true))
                     } ?: return@forEach
                 val key = fingerprint(asset.id, item.action, item.quantity, item.unitPrice, item.fee, item.executedAt, item.currency, item.note)
