@@ -102,9 +102,9 @@ object ExcelImporter {
             val ticker = v(tickerCol).uppercase(Locale.ROOT)
             val qty = number(v(qtyCol)); val cost = number(v(costCol))
             val category = category(v(categoryCol))
-            if ((ticker.isBlank() && category !in setOf("BANK", "CASH")) || qty == null || qty < 0.0 || cost == null || cost < 0.0) null
+            if ((ticker.isBlank() && marketSymbol.isBlank() && category !in setOf("BANK", "CASH")) || qty == null || qty < 0.0 || cost == null || cost < 0.0) null
             else {
-                val account = v(accountCol).ifBlank { "Ana Portföy" }
+                val account = v(accountCol)
                 ImportedAsset(parseLongId(v(idCol)), ticker, v(nameCol).ifBlank { ticker },
                     category, account, qty, number(v(unitCol)), v(currencyCol).ifBlank { if (category == "US_STOCK") "USD" else "TRY" }.uppercase(Locale.ROOT),
                     cost, v(brokerCol).ifBlank { account }, priceSource(v(sourceCol)),
