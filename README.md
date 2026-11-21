@@ -136,3 +136,33 @@ Hassas portföy bilgileri, hesap numaraları veya kişisel veriler içeren Excel
 ## Lisans
 
 Bu depoda ayrıca bir lisans dosyası yayımlanmadıysa, kodun yeniden dağıtım ve kullanım hakları için depo sahibinden izin alınmalıdır.
+
+
+## Kalıcı APK imzası ve güncelleme
+
+GitHub Actions ilk kurulumda varsayılan Android debug imzasını kullanabilir. GitHub'ın her yeni derleme için temiz bir sanal makine açması nedeniyle bu debug imzası sonraki derlemelerde değişebilir. Android, aynı paket adına sahip ancak farklı sertifikayla imzalanmış APK'nın mevcut uygulamanın üzerine kurulmasına izin vermez.
+
+Gelecek sürümlerde aynı imzayı kullanmak için bir kez bir imza anahtarı oluşturun ve GitHub deposunda **Settings → Secrets and variables → Actions** bölümüne şu dört Actions Secret değerini ekleyin:
+
+- `ANDROID_KEYSTORE_BASE64`: Keystore dosyasının Base64 içeriği.
+- `ANDROID_KEYSTORE_PASSWORD`: Keystore parolası.
+- `ANDROID_KEY_ALIAS`: Anahtar takma adı.
+- `ANDROID_KEY_PASSWORD`: Anahtar parolası.
+
+Keystore oluşturma örneği:
+
+```bash
+keytool -genkeypair -v -keystore portfolio-release.jks -alias portfolio -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Linux/macOS Base64:
+```bash
+base64 -w 0 portfolio-release.jks
+```
+
+Windows PowerShell Base64:
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("portfolio-release.jks"))
+```
+
+Keystore dosyasını ve parolalarını güvenli bir yerde saklayın; sonraki sürümlerde aynı anahtar kullanılmalıdır. **Önemli:** Daha önce kurulmuş APK farklı/geçici bir debug anahtarıyla imzalandıysa yeni kalıcı anahtar o eski APK'nın imzasını geriye dönük olarak eşleştiremez. Bu durumda ilk geçişte uygulama verilerini Excel ile yedekleyip eski uygulamayı bir kez kaldırmak ve kalıcı imzalı sürümü kurmak gerekir. Sonraki sürümler aynı keystore ile imzalanırsa kaldırmadan güncellenebilir.
