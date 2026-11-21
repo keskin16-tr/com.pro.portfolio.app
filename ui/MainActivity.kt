@@ -1159,7 +1159,6 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(22), dp(8), dp(22), 0)
         }
-        val linkedAsset = currentAssets.firstOrNull { it.id == trade.assetId }
         val tradeMetaDate = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
         box.addView(TextView(this).apply {
             text = "İşlem ID: ${trade.id}  •  Varlık ID: ${trade.assetId}  •  Para birimi: ${trade.currency}\nKayıt tarihi: ${trade.createdAt?.let { tradeMetaDate.format(Date(it)) } ?: "—"}  •  Bakiye durumu: ${if (trade.applied) "Uygulandı" else "Yalnızca geçmiş kaydı"}\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}  •  TRY karşılığı: ${currency(trade.realizedProfitTry, "TRY")}"
