@@ -46,6 +46,14 @@ class PortfolioChartView(context: Context) : View(context) {
     private var plot = RectF()
 
     private fun color(i: Int) = colors[i.mod(colors.size)]
+
+    private fun ellipsize(value: String, maxWidth: Float, p: Paint): String {
+        if (maxWidth <= 0f) return ""
+        if (p.measureText(value) <= maxWidth) return value
+        var end = value.length
+        while (end > 1 && p.measureText(value.substring(0, end) + "…") > maxWidth) end--
+        return value.take(end) + "…"
+    }
     private fun number(v: Double): String {
         val a = abs(v)
         val s = when {
@@ -115,8 +123,14 @@ class PortfolioChartView(context: Context) : View(context) {
         c.drawPath(path, paint); paint.style = Paint.Style.FILL
         values.forEachIndexed { i, v -> paint.color = colors[0]; c.drawCircle(x(i), y(v), 2.8f * d, paint) }
         text.textAlign = Paint.Align.CENTER
-        val every = max(1, ceil(values.size / max(2f, (right - left) / (76f * d))).toInt())
-        labels.forEachIndexed { i, label -> if (i % every == 0 || i == labels.lastIndex) c.drawText(label.take(8), x(i), height - 8f * d, text) }
+        val maxTicks = max(2, ((right - left) / (62f * d)).toInt())
+        val every = max(1, ceil(values.size.toFloat() / maxTicks).toInt())
+        labels.forEachIndexed { i, label ->
+            if ((i % every == 0 || i == labels.lastIndex) && i < values.size) {
+                val available = min(58f * d, (right - left) / maxTicks)
+                c.drawText(ellipsize(label, available, text), x(i), height - 8f * d, text)
+            }
+        }
         text.textAlign = Paint.Align.LEFT
         if (selected in values.indices) {
             val sx = x(selected); c.drawLine(sx, top, sx, bottom, grid)
@@ -150,9 +164,10 @@ class PortfolioChartView(context: Context) : View(context) {
     }
 
     private fun drawHorizontal(c: Canvas) {
-        val left = min(148f * d, max(76f * d, width * .32f))
-        val right = width - 62f * d
-        val row = 34f * d; val top = 6f * d
+        val valueColumn = min(76f * d, width * .24f)
+        val left = min(142f * d, max(72f * d, width * .34f))
+        val right = width - valueColumn - 8f * d
+        val row = 36f * d; val top = 8f * d
         val lo = min(0.0, values.minOrNull() ?: 0.0)
         val hi = max(0.0, values.maxOrNull() ?: 0.0)
         val span = (hi - lo).coerceAtLeast(1e-12)
@@ -161,11 +176,12 @@ class PortfolioChartView(context: Context) : View(context) {
         values.forEachIndexed { i, v ->
             val yy = top + i * row
             text.textAlign = Paint.Align.RIGHT
-            c.drawText(labels.getOrNull(i).orEmpty().take(20), left - 8f * d, yy + 21f * d, text)
-            val end = x(v); paint.color = if (v < 0) 0xFFEF7895.toInt() else color(i)
-            c.drawRoundRect(RectF(min(zero, end), yy + 7f * d, max(min(zero, end) + 2f * d, end), yy + 25f * d), 3f * d, 3f * d, paint)
+            val labelWidth = (left - 12f * d).coerceAtLeast(24f * d)
+            c.drawText(ellipsize(labels.getOrNull(i).orEmpty(), labelWidth, text), left - 8f * d, yy + 22f * d, text)
+            val endX = x(v); paint.color = if (v < 0) 0xFFEF7895.toInt() else color(i)
+            c.drawRoundRect(RectF(min(zero, endX), yy + 8f * d, max(min(zero, endX) + 2f * d, endX), yy + 26f * d), 3f * d, 3f * d, paint)
             text.textAlign = Paint.Align.LEFT
-            c.drawText(number(v), max(zero, end) + 5f * d, yy + 21f * d, text)
+            c.drawText(ellipsize(number(v), valueColumn - 8f * d, text), right + 6f * d, yy + 22f * d, text)
             if (i == selected) tooltip(c, labels.getOrNull(i).orEmpty(), number(v))
         }
         c.drawLine(zero, top, zero, top + row * values.size, grid)
@@ -197,12 +213,17 @@ class PortfolioChartView(context: Context) : View(context) {
         paint.color = ContextCompat.getColor(context, R.color.portfolio_muted)
         paint.textSize = 10f * resources.displayMetrics.scaledDensity; paint.typeface = android.graphics.Typeface.DEFAULT
         c.drawText(centerCaption, cx, cy + 15f * d, paint)
-        val lx = width * .57f; val ly = 22f * d
+        val lx = width * .56f
+        val ly = max(18f * d, (height - rows.size * 27f * d) / 2f)
+        val pctWidth = 34f * d
+        val legendWidth = (width - lx - pctWidth - 22f * d).coerceAtLeast(24f * d)
         rows.forEachIndexed { i, item ->
-            val yy = ly + i * 24f * d
+            val yy = ly + i * 27f * d
             paint.color = color(i); c.drawCircle(lx, yy, 4f * d, paint)
-            text.textAlign = Paint.Align.LEFT; c.drawText(item.first.take(12), lx + 10f * d, yy + 3f * d, text)
-            text.textAlign = Paint.Align.RIGHT; c.drawText("\${(item.second / total * 100).toInt()}%", width - 8f * d, yy + 3f * d, text)
+            text.textAlign = Paint.Align.LEFT
+            c.drawText(ellipsize(item.first, legendWidth, text), lx + 10f * d, yy + 3f * d, text)
+            text.textAlign = Paint.Align.RIGHT
+            c.drawText("${(item.second / total * 100).toInt()}%", width - 8f * d, yy + 3f * d, text)
         }
         if (selected in rows.indices) tooltip(c, rows[selected].first, number(rows[selected].second))
     }

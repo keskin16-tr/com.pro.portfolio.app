@@ -66,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private var currentDividends: List<DividendEntity> = emptyList()
     private var currentSnapshots: List<PortfolioSnapshotEntity> = emptyList()
     private var currentRates: List<MarketRate> = emptyList()
+    private var ratesSyncing: Boolean = false
     private var currentPriceSnapshots: List<AssetPriceSnapshotEntity> = emptyList()
     private var tradeSearchQuery = ""
     private var tradeActionFilter = "Tümü"
@@ -104,15 +105,11 @@ class MainActivity : AppCompatActivity() {
         setupDashboardCharts()
 
         binding.fabAddAsset.visibility = View.GONE
-        binding.btnSellAsset.visibility = View.GONE
-        binding.btnAddDividend.visibility = View.GONE
         binding.btnTopAddAsset.setOnClickListener { showAddAssetDialog() }
-        binding.btnTopSell.setOnClickListener { showSellDialog() }
-        binding.btnTopImportExcel.setOnClickListener { launchExcelImport() }
-        binding.btnTopAddDividend.setOnClickListener { showDividendDialog() }
-        binding.btnTopManageAssets.setOnClickListener { showPage(NAV_ASSETS) }
-        binding.btnTopManageTrades.setOnClickListener { showPage(NAV_TRADES) }
+        binding.btnTopSell.text = "İşlem Ekle"
+        binding.btnTopSell.setOnClickListener { showAddTransactionDialog() }
         binding.btnCurrencyToggle.setOnClickListener { selectedSummaryCurrency = if (selectedSummaryCurrency == "TRY") "USD" else "TRY"; updateSummary() }
+        binding.tvTopRatesStatus.setOnClickListener { viewModel.refreshRates() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -125,7 +122,6 @@ class MainActivity : AppCompatActivity() {
                     binding.tvEmptyState.visibility = if (assets.isEmpty()) View.VISIBLE else View.GONE
                     updateDashboardAllocationChart()
 
-                    binding.btnSellAsset.isEnabled = assets.any { it.quantity > 0.0 }
                     updatePageContent()
                 }
             }
@@ -162,7 +158,15 @@ class MainActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.rates.collect { currentRates = it; updateSummary(); renderMarketRates() }
+                viewModel.rates.collect { currentRates = it; updateSummary(); renderMarketRates(); renderTopRates() }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.ratesSyncing.collect { syncing ->
+                    ratesSyncing = syncing
+                    renderTopRates()
+                }
             }
         }
     }
@@ -191,34 +195,54 @@ class MainActivity : AppCompatActivity() {
     private fun importExcel(uri: Uri) {
         lifecycleScope.launch {
             try {
-                val rows = withContext(Dispatchers.IO) {
-                    contentResolver.openInputStream(uri)?.use { ExcelImporter.readHoldings(it) }
+                val backup = withContext(Dispatchers.IO) {
+                    contentResolver.openInputStream(uri)?.use { ExcelImporter.readPortfolio(it) }
                         ?: error("Excel dosyası açılamadı.")
                 }
-                if (rows.isEmpty()) {
-                    Toast.makeText(this@MainActivity, "İçe aktarılabilecek geçerli varlık bulunamadı.", Toast.LENGTH_LONG).show()
-                    return@launch
-                }
-                val preview = rows.take(12).joinToString("\n") {
-                    "${it.ticker} • ${formatNumber(it.quantity)} adet • ${currency(it.costPrice)} • ${it.broker}"
-                } + if (rows.size > 12) "\n… ve ${rows.size - 12} kayıt daha" else ""
+                val tradeCounts = backup.trades.groupingBy { it.action }.eachCount()
+                val preview = backup.assets.take(10).joinToString("\n") {
+                    "${it.ticker} • ${formatNumber(it.quantity)} adet • ${currency(it.costPerUnit, it.currency)}"
+                } + if (backup.assets.size > 10) "\n… ve ${backup.assets.size - 10} varlık daha" else ""
+                val transactionSummary = "Alış: ${tradeCounts["BUY"] ?: 0} • Satış: ${tradeCounts["SELL"] ?: 0} • Para girişi: ${tradeCounts["CASH_IN"] ?: 0} • Para çıkışı: ${tradeCounts["CASH_OUT"] ?: 0} • Transfer: ${tradeCounts["TRANSFER"] ?: 0} • Temettü: ${tradeCounts["DIVIDEND"] ?: 0}"
                 androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Excel içe aktarma önizlemesi")
-                    .setMessage("${rows.size} geçerli varlık bulundu. Mevcut semboller tekrar eklenmeyecek.\n\n$preview")
+                    .setTitle("Excel yedeği doğrulandı")
+                    .setMessage(
+                        "${backup.assets.size} varlık ve ${backup.trades.size} işlem bulundu.\n$transactionSummary\n\n" +
+                            "Örnek varlıklar:\n$preview\n\n" +
+                            "Birleştir: mevcut varlıkları korur ve mükerrer olmayan işlem geçmişini ekler. Mevcut varlıklara ait içe aktarılan işlemler geçmiş kaydı olarak saklanır; bakiyeye yeniden uygulanmaz.\n\n" +
+                            "Tamamen değiştir: mevcut portföy ve geçmiş kayıtlarını Excel yedeğiyle değiştirir."
+                    )
                     .setNegativeButton("Vazgeç", null)
-                    .setPositiveButton("İçe aktar") { _, _ ->
-                        viewModel.importHoldings(rows) { result ->
-                            runOnUiThread {
-                                result.onSuccess { (added, skipped) ->
-                                    Toast.makeText(this@MainActivity, "$added varlık eklendi, $skipped tekrar eden sembol atlandı.", Toast.LENGTH_LONG).show()
-                                }.onFailure {
-                                    Toast.makeText(this@MainActivity, "İçe aktarma başarısız: ${it.message}", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    }.show()
+                    .setNeutralButton("Birleştir") { _, _ -> runPortfolioRestore(backup, overwrite = false) }
+                    .setPositiveButton("Tamamen değiştir") { _, _ ->
+                        androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Mevcut portföy silinecek")
+                            .setMessage("Mevcut varlıklar, işlemler, temettüler ve grafik geçmişi silinerek Excel yedeği yüklenecek. Bu işlem geri alınamaz. Devam edilsin mi?")
+                            .setNegativeButton("İptal", null)
+                            .setPositiveButton("Evet, yedeği yükle") { _, _ -> runPortfolioRestore(backup, overwrite = true) }
+                            .show()
+                    }
+                    .show()
             } catch (error: Exception) {
                 Toast.makeText(this@MainActivity, "Excel okunamadı: ${error.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun runPortfolioRestore(backup: com.portfolio.app.data.importer.ImportedPortfolio, overwrite: Boolean) {
+        viewModel.restorePortfolio(backup, overwrite) { result ->
+            runOnUiThread {
+                result.onSuccess { summary ->
+                    val mode = if (overwrite) "Yedek geri yüklendi" else "Yedek birleştirildi"
+                    Toast.makeText(
+                        this@MainActivity,
+                        "$mode: ${summary.assetsAdded} varlık, ${summary.tradesAdded} işlem eklendi; " +
+                            "${summary.assetsSkipped} varlık ve ${summary.tradesSkipped} işlem atlandı.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }.onFailure { error ->
+                    Toast.makeText(this@MainActivity, "Geri yükleme başarısız; veritabanı değişmedi: ${error.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
@@ -271,9 +295,7 @@ class MainActivity : AppCompatActivity() {
             content.addView(body)
             if (id == NAV_ASSETS) content.addView(actionButton("Yeni varlık / alış ekle", R.color.portfolio_green) { showAddAssetDialog() })
             if (id == NAV_TRADES) {
-                content.addView(actionButton("Alış / varlık ekle", R.color.portfolio_green) { showAddAssetDialog() })
-                content.addView(actionButton("Satış yap", R.color.portfolio_orange) { showSellDialog() })
-                content.addView(actionButton("Temettü ekle", R.color.portfolio_purple) { showDividendDialog() })
+                content.addView(actionButton("İşlem Ekle", R.color.portfolio_green) { showAddTransactionDialog() })
             }
             if (id == NAV_TRADES) {
                 val search = android.widget.EditText(this).apply {
@@ -299,7 +321,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     filters.addView(spinner, LinearLayout.LayoutParams(0, dp(48), 1f))
                 }
-                addFilter(listOf("Tümü", "Alış", "Satış", "Temettü")) { tradeActionFilter = it }
+                addFilter(listOf("Tümü", "Alış", "Satış", "Para Girişi", "Para Çıkışı", "Transfer", "Temettü")) { tradeActionFilter = it }
                 addFilter(listOf("Tümü", "TRY", "USD")) { tradeCurrencyFilter = it }
                 addFilter(listOf("Tümü", "7 gün", "30 gün", "90 gün", "Bu yıl")) { tradeDateFilter = it }
                 content.addView(filters)
@@ -430,11 +452,11 @@ class MainActivity : AppCompatActivity() {
         pageTexts[NAV_CATEGORIES]?.text = ""
         pageTexts[NAV_BROKERS]?.text = ""
         pageTexts[NAV_IMPORT]?.text =
-            "Excel (.xlsx) dosyasının ilk sayfasında Sembol, Varlık, Kategori, Adet ve Ortalama Maliyet sütunları bulunmalı.\n\nBu işlem mevcut portföy varlıklarını içe aktarır; işlem ve temettü geçmişini içe aktarmaz. Portfolio Pro dışa aktarma dosyaları doğrudan kullanılabilir. Aynı sembol varsa tekrar eklenmez. Önizleme onayından sonra yeni kayıtlar eklenir."
+            "Excel çalışma kitabında Varlıklar ve İşlemler sayfaları bulunmalıdır. Varlıklar sayfası id, name, symbol, category, account, quantity, unit_price, currency ve cost_per_unit alanlarını; İşlemler sayfası işlem türü, miktar, birim fiyat, tarih, applied ve gerçekleşen kâr/zarar alanlarını kullanır. Alış, satış, para girişi, para çıkışı, transfer ve temettü geçmişi birlikte geri yüklenir. Birleştirme mevcut varlıkları korur; tam değiştirme mevcut portföyü yedek dosyayla değiştirir."
         pageTexts[NAV_MORE]?.text =
             "Kategori ve aracı kurum dağılımlarını inceleyin; temettü kayıtlarına ulaşın veya Excel dosyalarını içe/dışa aktarın."
         pageTexts[NAV_EXPORT]?.text =
-            "Excel çalışma kitabı Portföy, İşlemler ve Temettüler sayfalarını içerir. Portföy sayfasında kategori ve aracı kurum bilgileri de bulunur. Kayıtlar cihazınızdaki yerel veritabanından alınır."
+            "Excel çalışma kitabı, kullandığınız dosyayla aynı Varlıklar ve İşlemler sayfalarını ve aynı sütun adlarını kullanır. Alış, satış, para girişi, para çıkışı, transfer ve temettü kayıtları tek işlem geçmişinde saklanır."
         renderAnalytics()
     }
 
@@ -442,7 +464,7 @@ class MainActivity : AppCompatActivity() {
         val displayCurrency = selectedSummaryCurrency
         val usdTry = currentRates.firstOrNull { it.title.equals("Dolar / TL", true) }?.value
         val hasTry = currentAssets.any { it.currency.equals("TRY", true) } || currentTrades.any { it.currency.equals("TRY", true) } || currentDividends.any { it.currency.equals("TRY", true) }
-        val hasUsd = currentAssets.any { it.currency.equals("USD", true) } || currentTrades.any { it.currency.equals("USD", true) } || currentDividends.any { it.currency.equals("USD", true) }
+        val hasUsd = currentAssets.any { it.currency.equals("USD", true) || it.currency.equals("USDT", true) } || currentTrades.any { it.currency.equals("USD", true) } || currentDividends.any { it.currency.equals("USD", true) }
         fun convert(amount: Double, source: String): Double? {
             if (source.equals(displayCurrency, true)) return amount
             val rate = usdTry?.takeIf { it > 0.0 } ?: return null
@@ -454,16 +476,18 @@ class MainActivity : AppCompatActivity() {
             if ((hasTry && t == null) || (hasUsd && u == null)) return null
             return (t ?: 0.0) + (u ?: 0.0)
         }
-        val marketValue = total { code -> currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
+        fun isCurrency(actual: String, requested: String) =
+            actual.equals(requested, true) || (requested == "USD" && actual.equals("USDT", true))
+        val marketValue = total { code -> currentAssets.filter { isCurrency(it.currency, code) }.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
         val pnl = total { code ->
-            val unrealized = currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.quantity * ((it.lastPrice ?: it.costPrice) - it.costPrice) }
-            val realized = currentTrades.filter { it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
-            val dividends = currentDividends.filter { it.currency.equals(code, true) }.sumOf { it.netAmount }
+            val unrealized = currentAssets.filter { isCurrency(it.currency, code) }.sumOf { it.quantity * ((it.lastPrice ?: it.costPrice) - it.costPrice) }
+            val realized = currentTrades.filter { it.action == "SELL" && isCurrency(it.currency, code) }.sumOf { it.realizedProfit }
+            val dividends = currentDividends.filter { isCurrency(it.currency, code) }.sumOf { it.netAmount }
             unrealized + realized + dividends
         }
         val capital = total { code ->
-            val opening = currentAssets.filter { it.currency.equals(code, true) }.sumOf { it.openingQuantity * it.openingCostPrice }
-            val buys = currentTrades.filter { it.action == "BUY" && it.currency.equals(code, true) }.sumOf { it.quantity * it.unitPrice + it.fee }
+            val opening = currentAssets.filter { isCurrency(it.currency, code) }.sumOf { it.openingQuantity * it.openingCostPrice }
+            val buys = currentTrades.filter { it.action == "BUY" && isCurrency(it.currency, code) }.sumOf { it.quantity * it.unitPrice + it.fee }
             opening + buys
         }
         val percent = if (pnl != null && capital != null && capital > 0.0) pnl / capital * 100.0 else null
@@ -688,6 +712,71 @@ class MainActivity : AppCompatActivity() {
         card.addView(column); list.addView(card)
     }
 
+
+    private fun renderTopRates() {
+        val rows = listOf(binding.topRatesRowOne, binding.topRatesRowTwo)
+        rows.forEach { it.removeAllViews() }
+        val definitions = listOf("Dolar / TL", "Euro / TL", "Gram Altın", "Gram Gümüş")
+        val latestTime = currentRates.maxOfOrNull { it.updatedAt }
+        val timeText = latestTime?.let {
+            SimpleDateFormat("HH:mm", Locale("tr", "TR")).format(Date(it))
+        } ?: "Henüz veri yok"
+        binding.tvTopRatesStatus.text = when {
+            ratesSyncing && latestTime != null -> "⟳ Güncelleniyor • Son: $timeText"
+            ratesSyncing -> "⟳ Kurlar alınıyor..."
+            latestTime != null -> "Son: $timeText • Yenile"
+            else -> "Kur verisi bekleniyor • Yenile"
+        }
+        binding.tvTopRatesStatus.setTextColor(ContextCompat.getColor(
+            this, if (ratesSyncing) R.color.portfolio_blue else R.color.portfolio_muted
+        ))
+
+        definitions.forEachIndexed { index, title ->
+            val rate = currentRates.firstOrNull { it.title.equals(title, true) }
+            val card = com.google.android.material.card.MaterialCardView(this).apply {
+                radius = dp(15).toFloat()
+                setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+                setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue)))
+                strokeWidth = dp(1)
+                cardElevation = 0f
+                layoutParams = LinearLayout.LayoutParams(0, dp(102), 1f).apply {
+                    if (index % 2 == 0) marginEnd = dp(5) else marginStart = dp(5)
+                    if (index >= 2) topMargin = dp(8)
+                }
+            }
+            val column = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), dp(10), dp(10), dp(8))
+            }
+            column.addView(TextView(this).apply {
+                text = when (index) { 0 -> "USD/TRY"; 1 -> "EUR/TRY"; 2 -> "ALTIN (GR)"; else -> "GÜMÜŞ (GR)" }
+                textSize = 11f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            })
+            column.addView(TextView(this).apply {
+                text = rate?.let { currency(it.value, it.currency) } ?: "—"
+                textSize = 19f
+                typeface = Typeface.DEFAULT_BOLD
+                fontFeatureSettings = "tnum"
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+                setPadding(0, dp(5), 0, dp(2))
+            })
+            val change = rate?.dailyChangePercent
+            column.addView(TextView(this).apply {
+                text = change?.let { String.format(Locale("tr", "TR"), "%+.2f%%", it) } ?: "Günlük değişim —"
+                textSize = 11f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(ContextCompat.getColor(
+                    this@MainActivity,
+                    if ((change ?: 0.0) < 0.0) R.color.portfolio_orange else R.color.portfolio_green
+                ))
+            })
+            card.addView(column)
+            rows[index / 2].addView(card)
+        }
+    }
+
     private fun renderMarketRates() {
         val container = ratesContainer ?: return
         container.removeAllViews()
@@ -755,7 +844,10 @@ class MainActivity : AppCompatActivity() {
         val chart = com.portfolio.app.ui.chart.PortfolioChartView(this).apply {
             this.type = type; this.values = values; this.labels = labels
             centerValue = center; this.suffix = suffix
-            layoutParams = LinearLayout.LayoutParams(-1, dp(height))
+            val chartHeight = if (type == com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT) {
+                maxOf(height, labels.size.coerceAtMost(8) * 30 + 28)
+            } else height
+            layoutParams = LinearLayout.LayoutParams(-1, dp(chartHeight))
         }
         container.addView(chart)
     }
@@ -849,6 +941,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderAnalytics() {
         val container = analyticsContainer ?: return
+        fun isCurrency(actual: String, requested: String) =
+            actual.equals(requested, true) || (requested == "USD" && actual.equals("USDT", true))
         container.removeAllViews()
         val active = currentAssets.filter { it.quantity > 0.0 }
         if (active.isEmpty()) {
@@ -859,7 +953,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         listOf("TRY", "USD").forEach { code ->
-            val group = active.filter { it.currency.equals(code, true) }
+            val group = active.filter { isCurrency(it.currency, code) }
             if (group.isNotEmpty()) {
                 container.addView(TextView(this).apply {
                     text = if (code == "TRY") "TÜRK LİRASI PORTFÖYÜ" else "ABD DOLARI PORTFÖYÜ"
@@ -875,8 +969,8 @@ class MainActivity : AppCompatActivity() {
                 addPortfolioChart(container, "Gerçekleşmemiş kâr / zarar", "Ortalama maliyet ile son fiyat farkı • $code",
                     com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR, unrealized, group.map { it.ticker },
                     maxOf(160, group.size * 36 + 20), suffix = if (code == "TRY") " ₺" else " $")
-                val realized = currentTrades.filter { it.action == "SELL" && it.currency.equals(code, true) }.sumOf { it.realizedProfit }
-                val dividends = currentDividends.filter { it.currency.equals(code, true) }.sumOf { it.netAmount }
+                val realized = currentTrades.filter { it.action == "SELL" && isCurrency(it.currency, code) }.sumOf { it.realizedProfit }
+                val dividends = currentDividends.filter { isCurrency(it.currency, code) }.sumOf { it.netAmount }
                 val pnlCard = TextView(this).apply {
                     text = "Gerçekleşmiş satış K/Z: ${currency(realized, code)}\nNet temettü: ${currency(dividends, code)}\nToplam gerçekleşmiş gelir: ${currency(realized + dividends, code)}"
                     textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
@@ -967,7 +1061,15 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-    private fun tradeTypeLabel(action: String) = when(action) { "SELL" -> "SATIŞ"; "DIVIDEND" -> "TEMETTÜ"; else -> "ALIŞ" }
+    private fun tradeTypeLabel(action: String) = when(action) {
+        "BUY" -> "ALIŞ"
+        "SELL" -> "SATIŞ"
+        "CASH_IN" -> "PARA GİRİŞİ"
+        "CASH_OUT" -> "PARA ÇIKIŞI"
+        "TRANSFER" -> "TRANSFER"
+        "DIVIDEND" -> "TEMETTÜ"
+        else -> action
+    }
 
     private fun categoryLabel(value: String) = when (value.uppercase(Locale.ROOT)) {
         "STOCK", "BIST", "HISSE" -> "Hisse (BIST)"
@@ -978,6 +1080,7 @@ class MainActivity : AppCompatActivity() {
         "GOLD" -> "Altın"
         "COMMODITY" -> "Emtia"
         "BOND" -> "Tahvil / Bono"
+        "BANK" -> "Banka"
         "CASH" -> "Nakit"
         else -> "Diğer"
     }
@@ -1002,8 +1105,8 @@ class MainActivity : AppCompatActivity() {
             this, android.R.layout.simple_spinner_dropdown_item,
             currentAssets.map { "${it.ticker} — ${it.name}" }
         )
-        val categoryCodes = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
-        val categoryLabels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto Para", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Nakit", "Diğer")
+        val categoryCodes = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "BANK", "CASH", "OTHER")
+        val categoryLabels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto Para", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Banka", "Nakit", "Diğer")
         val categorySpinner = android.widget.Spinner(this)
         categorySpinner.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, categoryLabels)
         val brokerNames = listOf("Belirtilmedi", "İş Yatırım", "Garanti BBVA Yatırım", "Yapı Kredi Yatırım", "Ak Yatırım", "Ziraat Yatırım", "QNB Invest", "Midas", "PhillipCapital", "A1 Capital", "Diğer")
@@ -1046,92 +1149,160 @@ class MainActivity : AppCompatActivity() {
             }.show()
     }
 
-    private fun showSellDialog() {
-        val available = viewModel.assets.value.filter { it.quantity > 0.0 }
-        if (available.isEmpty()) {
-            Toast.makeText(this, "Satış yapmak için portföyde varlık bulunmalı.", Toast.LENGTH_LONG).show()
+    private fun showAddTransactionDialog() {
+        if (currentAssets.isEmpty()) {
+            Toast.makeText(this, "İşlem eklemeden önce bir varlık oluşturun.", Toast.LENGTH_LONG).show()
+            showAddAssetDialog()
             return
         }
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(56, 12, 56, 0) }
-        val spinner = android.widget.Spinner(this)
-        spinner.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item,
-            available.map { "${it.ticker} — ${formatNumber(it.quantity)} adet" })
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(8), dp(22), 0)
+        }
+        val actionCodes = listOf("BUY", "SELL", "CASH_IN", "CASH_OUT", "TRANSFER", "DIVIDEND")
+        val actionLabels = listOf("Alış", "Satış", "Para Girişi", "Para Çıkışı", "Transfer", "Temettü")
+        val typeSpinner = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, actionLabels)
+        }
+        var selectableAssets = currentAssets
+        val assetSpinner = android.widget.Spinner(this)
+        fun refreshAssets(items: List<AssetEntity>) {
+            selectableAssets = items
+            assetSpinner.adapter = android.widget.ArrayAdapter(
+                this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
+                items.map { "${it.ticker} — ${it.name} (${it.currency} • ${it.broker})" }
+            )
+        }
+        refreshAssets(currentAssets)
         fun field(hintText: String) = android.widget.EditText(this).apply {
             hint = hintText
+            isSingleLine = true
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
         }
-        val quantity = field("Satılacak miktar")
-        val price = field("Birim satış fiyatı (${available.first().currency})")
-        val fee = field("Komisyon / masraf (${available.first().currency})").apply { setText("0") }
-        spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
-            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                val code = available[position.coerceIn(0, available.lastIndex)].currency
-                price.hint = "Birim satış fiyatı ($code)"
-                fee.hint = "Komisyon / masraf ($code)"
-            }
+        val quantity = field("Miktar / tutar")
+        val price = field("Birim fiyat")
+        val fee = field("Komisyon / stopaj")
+        val destination = android.widget.EditText(this).apply {
+            hint = "Hedef hesap / aracı kurum"
+            isSingleLine = true
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
         }
-        box.addView(spinner); box.addView(quantity); box.addView(price); box.addView(fee)
-        androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Varlık satışı").setView(box)
-            .setNegativeButton("İptal", null)
-            .setPositiveButton("Satışı kaydet") { _, _ ->
-                val asset = available[spinner.selectedItemPosition.coerceIn(0, available.lastIndex)]
-                val qty = parseNumber(quantity.text.toString())
-                val unitPrice = parseNumber(price.text.toString())
-                val commission = parseNumber(fee.text.toString()) ?: 0.0
-                if (qty == null || qty <= 0.0 || unitPrice == null || unitPrice < 0.0 || commission < 0.0) {
-                    Toast.makeText(this, "Geçerli miktar, satış fiyatı ve komisyon girin.", Toast.LENGTH_LONG).show()
-                } else viewModel.sellAsset(asset.id, qty, unitPrice, commission) { result ->
-                    runOnUiThread {
-                        result.onSuccess { Toast.makeText(this, "Satış kaydedildi.", Toast.LENGTH_LONG).show() }
-                            .onFailure { Toast.makeText(this, it.message ?: "Satış kaydedilemedi.", Toast.LENGTH_LONG).show() }
-                    }
-                }
-            }.show()
-    }
-
-    private fun showDividendDialog() {
-        if (currentAssets.isEmpty()) {
-            Toast.makeText(this, "Temettü kaydetmeden önce ilgili varlığı ekleyin.", Toast.LENGTH_LONG).show()
-            return
+        val note = android.widget.EditText(this).apply {
+            hint = "Açıklama / not (isteğe bağlı)"
+            isSingleLine = true
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
         }
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(8), dp(22), 0) }
-        val assetSpinner = android.widget.Spinner(this).apply {
-            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, currentAssets.map { "${it.ticker} — ${it.name}" })
+        fun label(value: String) = TextView(this).apply {
+            text = value
+            textSize = 12f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            setPadding(0, dp(8), 0, dp(2))
         }
-        val currencySpinner = android.widget.Spinner(this).apply {
-            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Türk Lirası (TRY)", "ABD Doları (USD)"))
-        }
-        fun field(hint: String) = android.widget.EditText(this).apply {
-            this.hint = hint; isSingleLine = true
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-        }
-        val gross = field("Brüt temettü tutarı")
-        val tax = field("Stopaj oranı (%)").apply { setText("0") }
-        val note = android.widget.EditText(this).apply { hint = "Not (isteğe bağlı)" }
-        box.addView(TextView(this).apply { text = "Temettü alınan varlık"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)) })
+        box.addView(label("İşlem türü"))
+        box.addView(typeSpinner)
+        box.addView(label("Varlık / hesap"))
         box.addView(assetSpinner)
-        box.addView(TextView(this).apply { text = "Ödeme para birimi"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(10), 0, 0) })
-        box.addView(currencySpinner); box.addView(gross); box.addView(tax); box.addView(note)
-        assetSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
-            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                currencySpinner.setSelection(if (currentAssets[position].currency == "USD") 1 else 0)
+        box.addView(quantity)
+        box.addView(price)
+        box.addView(fee)
+        box.addView(destination)
+        box.addView(note)
+
+        fun updateFields() {
+            val action = actionCodes[typeSpinner.selectedItemPosition.coerceIn(0, actionCodes.lastIndex)]
+            val cashAction = action == "CASH_IN" || action == "CASH_OUT"
+            val eligible = if (cashAction) currentAssets.filter {
+                it.category.equals("CASH", true) || it.category.equals("BANK", true) || it.ticker.equals("TRY", true) || it.ticker.equals("USD", true)
+            } else currentAssets
+            refreshAssets(eligible.ifEmpty { currentAssets })
+            quantity.visibility = if (action == "TRANSFER") View.GONE else View.VISIBLE
+            price.visibility = if (action in setOf("BUY", "SELL")) View.VISIBLE else View.GONE
+            fee.visibility = if (action in setOf("BUY", "SELL", "DIVIDEND")) View.VISIBLE else View.GONE
+            destination.visibility = if (action == "TRANSFER") View.VISIBLE else View.GONE
+            quantity.hint = when (action) {
+                "CASH_IN", "CASH_OUT" -> "Tutar (${selectableAssets.firstOrNull()?.currency ?: "TRY"})"
+                "DIVIDEND" -> "Brüt temettü tutarı"
+                else -> "Miktar"
+            }
+            price.hint = "Birim fiyat (${selectableAssets.firstOrNull()?.currency ?: "TRY"})"
+            fee.hint = if (action == "DIVIDEND") "Stopaj oranı (%)" else "Komisyon / masraf"
+            if (action == "DIVIDEND" && fee.text.isNullOrBlank()) fee.setText("0")
+            if (action == "BUY" || action == "SELL") {
+                quantity.hint = if (action == "BUY") "Alınacak miktar" else "Satılacak miktar"
             }
         }
-        androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Temettüyü işlem olarak ekle").setView(box)
+        typeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) = updateFields()
+        }
+        updateFields()
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Yeni işlem")
+            .setView(box)
             .setNegativeButton("İptal", null)
             .setPositiveButton("Kaydet") { _, _ ->
-                val asset = currentAssets[assetSpinner.selectedItemPosition.coerceIn(0, currentAssets.lastIndex)]
-                val amount = parseNumber(gross.text.toString())
-                val taxRate = parseNumber(tax.text.toString()) ?: 0.0
-                val currencyCode = if (currencySpinner.selectedItemPosition == 1) "USD" else "TRY"
-                if (amount == null || amount <= 0.0 || taxRate !in 0.0..100.0) {
-                    Toast.makeText(this, "Pozitif brüt tutar ve %0–100 stopaj girin.", Toast.LENGTH_LONG).show()
-                } else {
-                    viewModel.addDividend(asset.ticker, amount, taxRate, currencyCode)
-                    Toast.makeText(this, "Temettü işlemi kaydediliyor.", Toast.LENGTH_SHORT).show()
-                    showPage(NAV_TRADES)
+                val action = actionCodes[typeSpinner.selectedItemPosition.coerceIn(0, actionCodes.lastIndex)]
+                val asset = selectableAssets.getOrNull(assetSpinner.selectedItemPosition)
+                if (asset == null) {
+                    Toast.makeText(this, "İşlem için uygun varlık seçin.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                val qtyOrAmount = parseNumber(quantity.text.toString())
+                val unitPrice = parseNumber(price.text.toString())
+                val commission = parseNumber(fee.text.toString()) ?: 0.0
+                val memo = note.text.toString().trim()
+                when (action) {
+                    "BUY" -> {
+                        if (qtyOrAmount == null || qtyOrAmount <= 0.0 || unitPrice == null || unitPrice < 0.0 || commission < 0.0) {
+                            Toast.makeText(this, "Alış miktarı, birim fiyat ve komisyonu kontrol edin.", Toast.LENGTH_LONG).show()
+                        } else viewModel.buyAsset(asset, qtyOrAmount, unitPrice, commission, memo) { result ->
+                            runOnUiThread {
+                                result.onSuccess { Toast.makeText(this, "Alış işlemi kaydedildi.", Toast.LENGTH_LONG).show() }
+                                    .onFailure { Toast.makeText(this, it.message ?: "Alış kaydedilemedi.", Toast.LENGTH_LONG).show() }
+                            }
+                        }
+                    }
+                    "SELL" -> {
+                        if (qtyOrAmount == null || qtyOrAmount <= 0.0 || unitPrice == null || unitPrice < 0.0 || commission < 0.0) {
+                            Toast.makeText(this, "Satış miktarı, birim fiyat ve komisyonu kontrol edin.", Toast.LENGTH_LONG).show()
+                        } else viewModel.sellAsset(asset.id, qtyOrAmount, unitPrice, commission, memo.ifBlank { "Satış işlemi" }) { result ->
+                            runOnUiThread {
+                                result.onSuccess { Toast.makeText(this, "Satış işlemi kaydedildi.", Toast.LENGTH_LONG).show() }
+                                    .onFailure { Toast.makeText(this, it.message ?: "Satış kaydedilemedi.", Toast.LENGTH_LONG).show() }
+                            }
+                        }
+                    }
+                    "CASH_IN", "CASH_OUT" -> {
+                        if (qtyOrAmount == null || qtyOrAmount <= 0.0) {
+                            Toast.makeText(this, "Pozitif bir tutar girin.", Toast.LENGTH_LONG).show()
+                        } else viewModel.addCashFlow(asset.id, action, qtyOrAmount, memo) { result ->
+                            runOnUiThread {
+                                result.onSuccess { Toast.makeText(this, if (action == "CASH_IN") "Para girişi kaydedildi." else "Para çıkışı kaydedildi.", Toast.LENGTH_LONG).show() }
+                                    .onFailure { Toast.makeText(this, it.message ?: "Para hareketi kaydedilemedi.", Toast.LENGTH_LONG).show() }
+                            }
+                        }
+                    }
+                    "TRANSFER" -> {
+                        val target = destination.text.toString().trim()
+                        if (target.isBlank()) {
+                            Toast.makeText(this, "Hedef hesap / aracı kurum girin.", Toast.LENGTH_LONG).show()
+                        } else viewModel.transferAsset(asset.id, target, memo) { result ->
+                            runOnUiThread {
+                                result.onSuccess { Toast.makeText(this, "Transfer kaydedildi.", Toast.LENGTH_LONG).show() }
+                                    .onFailure { Toast.makeText(this, it.message ?: "Transfer kaydedilemedi.", Toast.LENGTH_LONG).show() }
+                            }
+                        }
+                    }
+                    "DIVIDEND" -> {
+                        val gross = qtyOrAmount
+                        if (gross == null || gross <= 0.0 || commission !in 0.0..100.0) {
+                            Toast.makeText(this, "Pozitif brüt temettü ve %0–100 stopaj oranı girin.", Toast.LENGTH_LONG).show()
+                        } else {
+                            viewModel.addDividend(asset.ticker, gross, commission, asset.currency, memo, asset.broker)
+                            Toast.makeText(this, "Temettü işlemi kaydediliyor.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 }
             }.show()
     }
@@ -1144,7 +1315,7 @@ class MainActivity : AppCompatActivity() {
             val symbol = symbols[trade.assetId]?.ticker ?: "Varlık #${trade.assetId}"
             val type = tradeTypeLabel(trade.action)
             val amount = trade.quantity * trade.unitPrice
-            val result = if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}" else if (trade.action == "DIVIDEND") "\nNet temettü: ${currency(trade.unitPrice - trade.fee, trade.currency)}" else ""
+            val result = if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}" else if (trade.action == "DIVIDEND") "\nNet temettü: ${currency(trade.quantity * trade.unitPrice - trade.fee, trade.currency)}" else ""
             "${dateFormat.format(Date(trade.executedAt))}  •  $type $symbol\n${formatNumber(trade.quantity)} × ${currency(trade.unitPrice, trade.currency)} = ${currency(amount, trade.currency)}\n${if (trade.action == "DIVIDEND") "Stopaj" else "Komisyon"}: ${currency(trade.fee, trade.currency)}$result"
         }
     }
@@ -1198,7 +1369,11 @@ class MainActivity : AppCompatActivity() {
         val filteredTrades = currentTrades.filter { trade ->
             val asset = assets[trade.assetId]
             val symbol = asset?.ticker ?: "Varlık #${trade.assetId}"
-            val actionLabel = when (trade.action) { "BUY" -> "Alış"; "SELL" -> "Satış"; "DIVIDEND" -> "Temettü"; else -> trade.action }
+            val actionLabel = when (trade.action) {
+                "BUY" -> "Alış"; "SELL" -> "Satış"; "CASH_IN" -> "Para Girişi"
+                "CASH_OUT" -> "Para Çıkışı"; "TRANSFER" -> "Transfer"; "DIVIDEND" -> "Temettü"
+                else -> trade.action
+            }
             val matchesAction = tradeActionFilter == "Tümü" || actionLabel == tradeActionFilter
             val matchesCurrency = tradeCurrencyFilter == "Tümü" || trade.currency.equals(tradeCurrencyFilter, true)
             val query = tradeSearchQuery.trim()
@@ -1224,7 +1399,7 @@ class MainActivity : AppCompatActivity() {
             })
             column.addView(TextView(this).apply {
                 text = "${dateFormat.format(Date(trade.executedAt))}\nMiktar: ${formatNumber(trade.quantity)} × ${currency(trade.unitPrice, trade.currency)}\n${if (trade.action == "DIVIDEND") "Stopaj" else "Komisyon"}: ${currency(trade.fee, trade.currency)}" +
-                    if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}" else if (trade.action == "DIVIDEND") "\nNet temettü: ${currency(trade.unitPrice - trade.fee, trade.currency)}" else ""
+                    if (trade.action == "SELL") "\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}" else if (trade.action == "DIVIDEND") "\nNet temettü: ${currency(trade.quantity * trade.unitPrice - trade.fee, trade.currency)}" else ""
                 textSize = 13f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(6), 0, dp(10))
             })
             val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -1246,16 +1421,26 @@ class MainActivity : AppCompatActivity() {
     private fun showEditAssetDialog(asset: AssetEntity) {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(8), dp(22), 0) }
         fun field(hint: String, value: String) = android.widget.EditText(this).apply { this.hint = hint; setText(value); isSingleLine = true }
+        val metaDate = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
+        val metadata = TextView(this).apply {
+            text = "Varlık ID: ${asset.id}  •  Oluşturma: ${asset.createdAt?.let { metaDate.format(Date(it)) } ?: "—"}  •  Güncelleme: ${asset.updatedAt?.let { metaDate.format(Date(it)) } ?: "—"}"
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+        }
+        box.addView(metadata)
         val name = field("Varlık adı", asset.name)
-        val ticker = field("Sembol", asset.ticker)
-        val categories = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "CASH", "OTHER")
-        val labels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Nakit", "Diğer")
+        val ticker = field("Görünen sembol", asset.ticker)
+        val categories = listOf("STOCK", "US_STOCK", "FUND", "CRYPTO", "FX", "GOLD", "COMMODITY", "BOND", "BANK", "CASH", "OTHER")
+        val labels = listOf("Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Banka", "Nakit", "Diğer")
         val category = android.widget.Spinner(this).apply { adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, labels); setSelection(categories.indexOf(asset.category).coerceAtLeast(0)) }
-        val broker = field("Aracı kurum", asset.broker)
-        val currencyCodes = listOf("TRY", "USD")
+        val portfolioName = field("Hesap / aracı kurum (Excel: account)", asset.portfolioName.ifBlank { asset.broker })
+        val marketSymbol = field("Veri sağlayıcı sembolü / sorgu terimi", asset.marketSymbol)
+        val notes = field("Notlar", asset.notes)
+        val currencyCodes = listOf("TRY", "USD", "USDT", "EUR", "GBP", "JPY", "RUB")
+        val currencyLabels = listOf("Türk Lirası (TRY)", "ABD Doları (USD)", "Tether (USDT)", "Euro (EUR)", "İngiliz Sterlini (GBP)", "Japon Yeni (JPY)", "Rus Rublesi (RUB)")
         val currencySpinner = android.widget.Spinner(this).apply {
-            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Türk Lirası (TRY)", "ABD Doları (USD)"))
-            setSelection(if (asset.currency == "USD") 1 else 0)
+            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, currencyLabels)
+            setSelection(currencyCodes.indexOf(asset.currency.uppercase()).coerceAtLeast(0))
             isEnabled = currentTrades.none { it.assetId == asset.id }
         }
         val sourceCodes = listOf("AUTO", "YAHOO_FINANCE", "COINGECKO", "FRANKFURTER", "MANUAL")
@@ -1263,42 +1448,42 @@ class MainActivity : AppCompatActivity() {
             adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Otomatik", "Yahoo Finance", "CoinGecko", "Frankfurter", "Elle giriş"))
             setSelection(sourceCodes.indexOf(asset.priceSource).coerceAtLeast(0))
         }
-        val manualPrice = field("Elle girilecek güncel fiyat", (asset.lastPrice ?: asset.costPrice).toString()).apply {
+        val manualPrice = field("Güncel fiyat (elle kaynak seçilirse düzenlenir)", (asset.lastPrice ?: asset.costPrice).toString()).apply {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            visibility = if (asset.priceSource == "MANUAL") View.VISIBLE else View.GONE
+            isEnabled = asset.priceSource == "MANUAL"
         }
         sourceSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                manualPrice.visibility = if (sourceCodes[position] == "MANUAL") View.VISIBLE else View.GONE
+                manualPrice.isEnabled = sourceCodes[position] == "MANUAL"
             }
         }
-        val hasTrades = currentTrades.any { it.assetId == asset.id }
-        val quantity = if (!hasTrades) field("Miktar", asset.quantity.toString()) else null
-        val cost = if (!hasTrades) field("Ortalama maliyet", asset.costPrice.toString()) else null
-        box.addView(name); box.addView(ticker)
+        val hasTrades = currentTrades.any { it.assetId == asset.id && it.applied }
+        val quantity = field("Miktar", asset.quantity.toString()).apply { isEnabled = !hasTrades }
+        val cost = field("Ortalama maliyet", asset.costPrice.toString()).apply { isEnabled = !hasTrades }
+        box.addView(name); box.addView(ticker); box.addView(marketSymbol)
+        box.addView(portfolioName); box.addView(notes)
         box.addView(TextView(this).apply { text = "Kategori"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, 0) })
-        box.addView(category); box.addView(broker)
+        box.addView(category)
         box.addView(TextView(this).apply { text = "Para birimi"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, 0) })
         box.addView(currencySpinner)
         box.addView(TextView(this).apply { text = "Fiyat veri kaynağı"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, 0) })
         box.addView(sourceSpinner); box.addView(manualPrice)
+        box.addView(quantity); box.addView(cost)
         if (hasTrades) {
             box.addView(TextView(this).apply {
-                text = "Bu varlığın işlem geçmişi var. Miktar ve ortalama maliyet, İşlemler sayfasındaki alış/satış kayıtları düzenlenerek otomatik hesaplanır."
+                text = "İşlem geçmişi bulunduğu için miktar ve ortalama maliyet otomatik hesaplanır; bu alanlar yalnızca görüntülenir. Değişiklik için ilgili alış/satış işlemini düzenleyin."
                 textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(10), 0, 0)
             })
-        } else {
-            quantity?.let { box.addView(it) }; cost?.let { box.addView(it) }
         }
         androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Varlığı düzenle").setView(box)
             .setNegativeButton("İptal", null).setPositiveButton("Kaydet") { _, _ ->
                 val newName = name.text.toString().trim(); val newTicker = ticker.text.toString().trim().uppercase(Locale.ROOT)
-                val newBroker = broker.text.toString().trim().ifBlank { "Belirtilmedi" }
-                if (newName.isBlank() || newTicker.isBlank()) Toast.makeText(this, "Ad ve sembol boş olamaz.", Toast.LENGTH_LONG).show()
+                val newBroker = portfolioName.text.toString().trim().ifBlank { "Belirtilmedi" }
+                if (newName.isBlank()) Toast.makeText(this, "Varlık adı boş olamaz.", Toast.LENGTH_LONG).show()
                 else {
-                    val newQuantity = quantity?.let { parseNumber(it.text.toString()) }
-                    val newCost = cost?.let { parseNumber(it.text.toString()) }
+                    val newQuantity = if (hasTrades) null else parseNumber(quantity.text.toString())
+                    val newCost = if (hasTrades) null else parseNumber(cost.text.toString())
                     if (!hasTrades && (newQuantity == null || newQuantity < 0.0 || newCost == null || newCost < 0.0)) {
                         Toast.makeText(this, "Miktar ve ortalama maliyeti kontrol edin.", Toast.LENGTH_LONG).show()
                         return@setPositiveButton
@@ -1310,7 +1495,7 @@ class MainActivity : AppCompatActivity() {
                         Toast.makeText(this, "Elle giriş için geçerli güncel fiyat girin.", Toast.LENGTH_LONG).show()
                         return@setPositiveButton
                     }
-                    viewModel.updateAssetDetails(asset.id, newName, newTicker, categories[category.selectedItemPosition], newBroker, newQuantity, newCost, currencyCode, provider, manual) { result -> runOnUiThread {
+                    viewModel.updateAssetDetails(asset.id, newName, newTicker, categories[category.selectedItemPosition], newBroker, newBroker, marketSymbol.text.toString(), notes.text.toString(), newQuantity, newCost, currencyCode, provider, manual) { result -> runOnUiThread {
                     result.onSuccess { Toast.makeText(this, "Varlık bilgileri güncellendi.", Toast.LENGTH_SHORT).show() }
                         .onFailure { Toast.makeText(this, it.message ?: "Varlık güncellenemedi.", Toast.LENGTH_LONG).show() }
                 } }
@@ -1320,10 +1505,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun showEditTradeDialog(trade: TradeEntity) {
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(8), dp(22), 0) }
+        val tradeMetaDate = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR"))
+        box.addView(TextView(this).apply {
+            text = "İşlem ID: ${trade.id}  •  Varlık ID: ${trade.assetId}  •  Para birimi: ${trade.currency}\nKayıt tarihi: ${trade.createdAt?.let { tradeMetaDate.format(Date(it)) } ?: "—"}  •  Bakiye durumu: ${if (trade.applied) "Uygulandı" else "Yalnızca geçmiş kaydı"}\nGerçekleşen K/Z: ${currency(trade.realizedProfit, trade.currency)}  •  TRY karşılığı: ${currency(trade.realizedProfitTry, "TRY")}"
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            setPadding(0, 0, 0, dp(8))
+        })
+        val actionCodes = listOf("BUY", "SELL", "CASH_IN", "CASH_OUT", "TRANSFER", "DIVIDEND")
         val action = android.widget.Spinner(this).apply {
-            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Alış", "Satış", "Temettü"))
-            setSelection(when (trade.action) { "SELL" -> 1; "DIVIDEND" -> 2; else -> 0 })
-            isEnabled = false
+            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Alış", "Satış", "Para Girişi", "Para Çıkışı", "Transfer", "Temettü"))
+            setSelection(actionCodes.indexOf(trade.action).coerceAtLeast(0))
+        }
+        val selectableAssets = currentAssets
+        val assetSpinner = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
+                selectableAssets.map { "${it.ticker} — ${it.name} (${it.currency} • ${it.broker})" })
+            setSelection(selectableAssets.indexOfFirst { it.id == trade.assetId }.coerceAtLeast(0))
         }
         fun field(hint: String, value: String) = android.widget.EditText(this).apply {
             this.hint = hint; setText(value); isSingleLine = true
@@ -1345,21 +1543,33 @@ class MainActivity : AppCompatActivity() {
                 }, initial.get(java.util.Calendar.HOUR_OF_DAY), initial.get(java.util.Calendar.MINUTE), true).show()
             }, initial.get(java.util.Calendar.YEAR), initial.get(java.util.Calendar.MONTH), initial.get(java.util.Calendar.DAY_OF_MONTH)).show()
         }
-        val quantity = field("Miktar", trade.quantity.toString()).apply { isEnabled = trade.action != "DIVIDEND" }
-        val price = field(if (trade.action == "DIVIDEND") "Brüt temettü" else "Birim fiyat", trade.unitPrice.toString())
-        val fee = field(if (trade.action == "DIVIDEND") "Stopaj tutarı" else "Komisyon", trade.fee.toString())
+        val quantity = field(if (trade.action == "DIVIDEND") "Adet / hisse başı temettü" else "Miktar", trade.quantity.toString())
+        val price = field(if (trade.action == "DIVIDEND") "Hisse başı temettü" else "Birim fiyat", trade.unitPrice.toString())
+        val fee = field(if (trade.action == "DIVIDEND") "Toplam stopaj tutarı" else "Komisyon", trade.fee.toString())
         val note = android.widget.EditText(this).apply { hint = "Not"; setText(trade.note); isSingleLine = true; inputType = android.text.InputType.TYPE_CLASS_TEXT }
         box.addView(TextView(this).apply { text = "İşlem türü"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)) })
-        box.addView(action); box.addView(TextView(this).apply { text = "İşlem tarihi ve saati"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, dp(2)) }); box.addView(dateButton); box.addView(quantity); box.addView(price); box.addView(fee); box.addView(note)
+        box.addView(action)
+        box.addView(TextView(this).apply { text = "Varlık / hesap"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, dp(2)) })
+        box.addView(assetSpinner)
+        box.addView(TextView(this).apply { text = "İşlem tarihi ve saati"; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(8), 0, dp(2)) }); box.addView(dateButton); box.addView(quantity); box.addView(price); box.addView(fee); box.addView(note)
         androidx.appcompat.app.AlertDialog.Builder(this).setTitle("İşlemi düzenle").setView(box)
             .setNegativeButton("İptal", null).setPositiveButton("Kaydet") { _, _ ->
                 val qty = parseNumber(quantity.text.toString()); val unitPrice = parseNumber(price.text.toString()); val commission = parseNumber(fee.text.toString()) ?: 0.0
                 if (qty == null || qty <= 0.0 || unitPrice == null || unitPrice < 0.0 || commission < 0.0) Toast.makeText(this, "Miktar, fiyat ve komisyon değerlerini kontrol edin.", Toast.LENGTH_LONG).show()
-                else if (trade.action == "DIVIDEND" && commission > unitPrice) Toast.makeText(this, "Stopaj brüt temettüden yüksek olamaz.", Toast.LENGTH_LONG).show()
-                 else viewModel.editTrade(trade.id, trade.action, if (trade.action == "DIVIDEND") 1.0 else qty, unitPrice, commission, note.text.toString(), executedAt) { result -> runOnUiThread {
-                    result.onSuccess { Toast.makeText(this, "İşlem güncellendi; portföy ve kâr/zarar yeniden hesaplandı.", Toast.LENGTH_LONG).show() }
-                        .onFailure { Toast.makeText(this, it.message ?: "İşlem güncellenemedi.", Toast.LENGTH_LONG).show() }
-                } }
+                else if (actionCodes[action.selectedItemPosition] == "DIVIDEND" && commission > qty * unitPrice) Toast.makeText(this, "Stopaj brüt temettü tutarından yüksek olamaz.", Toast.LENGTH_LONG).show()
+                else {
+                    val selectedAsset = selectableAssets.getOrNull(assetSpinner.selectedItemPosition)
+                    if (selectedAsset == null) {
+                        Toast.makeText(this, "Bir varlık seçin.", Toast.LENGTH_LONG).show()
+                        return@setPositiveButton
+                    }
+                    viewModel.editTrade(trade.id, selectedAsset.id, actionCodes[action.selectedItemPosition], qty, unitPrice, commission, note.text.toString(), executedAt) { result ->
+                        runOnUiThread {
+                            result.onSuccess { Toast.makeText(this, "İşlem güncellendi; portföy ve kâr/zarar yeniden hesaplandı.", Toast.LENGTH_LONG).show() }
+                                .onFailure { Toast.makeText(this, it.message ?: "İşlem güncellenemedi.", Toast.LENGTH_LONG).show() }
+                        }
+                    }
+                }
             }.show()
     }
 
@@ -1374,7 +1584,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun parseNumber(raw: String) = raw.trim().replace(" ", "").replace(",", ".").toDoubleOrNull()?.takeIf { it.isFinite() }
     private fun formatNumber(value: Double) = NumberFormat.getNumberInstance(Locale("tr", "TR")).format(value)
-    private fun currency(value: Double, code: String = "TRY") = NumberFormat.getCurrencyInstance(Locale("tr", "TR")).apply { currency = java.util.Currency.getInstance(code.uppercase(Locale.ROOT)) }.format(value)
+    private fun currency(value: Double, code: String = "TRY"): String {
+        val normalized = code.uppercase(Locale.ROOT)
+        val currencyUnit = runCatching { java.util.Currency.getInstance(normalized) }.getOrNull()
+        return if (currencyUnit != null) {
+            NumberFormat.getCurrencyInstance(Locale("tr", "TR")).apply { currency = currencyUnit }.format(value)
+        } else {
+            "$normalized " + NumberFormat.getNumberInstance(Locale("tr", "TR")).format(value)
+        }
+    }
     private fun sourceLabel(source: String) = when(source.uppercase()) { "YAHOO_FINANCE" -> "Yahoo Finance"; "COINGECKO" -> "CoinGecko"; "FRANKFURTER" -> "Frankfurter"; "MANUAL" -> "Elle giriş"; else -> "Otomatik" }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 

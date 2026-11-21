@@ -9,12 +9,16 @@
         <item>Altın</item>
         <item>Emtia</item>
         <item>Tahvil / Bono</item>
+        <item>Banka</item>
         <item>Nakit</item>
         <item>Diğer</item>
     </string-array>
     <string-array name="asset_currency_labels">
         <item>Türk Lirası (TRY)</item>
         <item>ABD Doları (USD)</item>
+        <item>Tether (USDT)</item>
+        <item>Euro (EUR)</item>
+        <item>İngiliz Sterlini (GBP)</item>
     </string-array>
     <string-array name="price_source_labels">
         <item>Otomatik (kategoriye göre)</item>

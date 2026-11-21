@@ -18,4 +18,5 @@ interface AssetPriceSnapshotDao {
 
     @Query("SELECT * FROM asset_price_snapshots WHERE assetId=:assetId AND snapshotDate=:date LIMIT 1")
     suspend fun forDate(assetId: Long, date: Long): AssetPriceSnapshotEntity?
+    @Query("DELETE FROM asset_price_snapshots") suspend fun deleteAll()
 }

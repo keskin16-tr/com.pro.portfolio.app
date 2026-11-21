@@ -11,8 +11,8 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * Builds a standards-compliant OOXML workbook without a heavyweight spreadsheet dependency.
- * The workbook contains separate Holdings, Transactions and Dividends worksheets.
+ * Exports the same two-sheet structure used by the user's portfolio workbook:
+ * "Varlıklar" and "İşlemler". Column names intentionally match that workbook.
  */
 object ExcelExporter {
     fun write(
@@ -30,7 +30,6 @@ object ExcelExporter {
                   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
                   <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
                   <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-                  <Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
                 </Types>
             """.trimIndent())
             entry(zip, "_rels/.rels", """
@@ -43,9 +42,8 @@ object ExcelExporter {
                 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
                 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
                   <sheets>
-                    <sheet name="Portföy" sheetId="1" r:id="rId1"/>
+                    <sheet name="Varlıklar" sheetId="1" r:id="rId1"/>
                     <sheet name="İşlemler" sheetId="2" r:id="rId2"/>
-                    <sheet name="Temettüler" sheetId="3" r:id="rId3"/>
                   </sheets>
                 </workbook>
             """.trimIndent())
@@ -54,38 +52,81 @@ object ExcelExporter {
                 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
                   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
                   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
-                  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>
                 </Relationships>
             """.trimIndent())
 
-            val holdingsRows = mutableListOf<List<Any?>>()
-            holdingsRows += listOf("Sembol", "Varlık", "Kategori", "Portföy", "Adet", "Ortalama Maliyet", "Son Fiyat", "Piyasa Değeri", "Maliyet Tutarı", "Kâr/Zarar", "Para Birimi", "Aracı Kurum", "Fiyat Kaynağı")
-            assets.forEach { a ->
-                val price = a.lastPrice ?: a.costPrice
-                holdingsRows += listOf(a.ticker, a.name, a.category, a.portfolioName, a.quantity,
-                    a.costPrice, price, a.quantity * price, a.quantity * a.costPrice,
-                    a.quantity * (price - a.costPrice), a.currency, a.broker, a.priceSource)
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+            val assetRows = mutableListOf<List<Any?>>()
+            assetRows += listOf(
+                "id", "name", "symbol", "category", "account", "quantity", "unit_price",
+                "currency", "cost_per_unit", "notes", "created_at", "updated_at",
+                "price_source", "market_symbol"
+            )
+            assets.forEach { asset ->
+                assetRows += listOf(
+                    asset.id, asset.name, asset.ticker, categoryLabel(asset.category),
+                    asset.portfolioName, asset.quantity, asset.lastPrice ?: asset.costPrice,
+                    asset.currency, asset.costPrice, asset.notes,
+                    asset.createdAt?.let { dateFormat.format(Date(it)) },
+                    asset.updatedAt?.let { dateFormat.format(Date(it)) },
+                    sourceLabel(asset.priceSource), asset.marketSymbol
+                )
             }
-            val tradeRows = mutableListOf<List<Any?>>()
-            tradeRows += listOf("Tarih", "Sembol", "İşlem", "Miktar", "Birim Fiyat", "Tutar", "Komisyon / Stopaj", "Gerçekleşen K/Z", "Para Birimi", "Not")
+
             val assetById = assets.associateBy { it.id }
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
-            trades.forEach { t ->
-                tradeRows += listOf(dateFormat.format(Date(t.executedAt)), assetById[t.assetId]?.ticker ?: "ID ${t.assetId}",
-                    when (t.action) { "SELL" -> "SATIŞ"; "DIVIDEND" -> "TEMETTÜ"; else -> "ALIŞ" }, t.quantity, t.unitPrice,
-                    t.quantity * t.unitPrice, t.fee, t.realizedProfit, t.currency, t.note)
+            val tradeRows = mutableListOf<List<Any?>>()
+            tradeRows += listOf(
+                "id", "asset_id", "asset_name", "transaction_type", "quantity",
+                "unit_price", "currency", "transaction_date", "notes", "created_at",
+                "applied", "realized_pnl", "realized_pnl_try"
+            )
+            trades.forEach { trade ->
+                val asset = assetById[trade.assetId]
+                tradeRows += listOf(
+                    trade.id, trade.assetId, asset?.name ?: asset?.ticker.orEmpty(),
+                    actionLabel(trade.action), trade.quantity, trade.unitPrice, trade.currency,
+                    dateFormat.format(Date(trade.executedAt)), trade.note,
+                    trade.createdAt?.let { dateFormat.format(Date(it)) },
+                    if (trade.applied) 1 else 0, trade.realizedProfit,
+                    if (trade.currency.equals("TRY", true)) trade.realizedProfit else trade.realizedProfitTry
+                )
             }
-            val dividendRows = mutableListOf<List<Any?>>()
-            dividendRows += listOf("Ödeme Tarihi", "Sembol", "Ödeme Anındaki Adet", "Brüt Temettü", "Stopaj", "Net Temettü", "Para Birimi", "Not")
-            dividends.forEach { d ->
-                dividendRows += listOf(dateFormat.format(Date(d.paymentDate)), d.ticker, d.quantityAtPayment,
-                    d.grossAmount, d.withholdingTax, d.netAmount, d.currency, d.note)
-            }
-            entry(zip, "xl/worksheets/sheet1.xml", sheetXml(holdingsRows))
+
+            entry(zip, "xl/worksheets/sheet1.xml", sheetXml(assetRows))
             entry(zip, "xl/worksheets/sheet2.xml", sheetXml(tradeRows))
-            entry(zip, "xl/worksheets/sheet3.xml", sheetXml(dividendRows))
             zip.finish()
         }
+    }
+
+    private fun categoryLabel(value: String): String = when (value.uppercase(Locale.ROOT)) {
+        "STOCK", "BIST" -> "BIST Hisse"
+        "US_STOCK" -> "ABD Hisse / ETF"
+        "FUND" -> "Yatırım Fonu"
+        "CRYPTO" -> "Kripto"
+        "FX" -> "Döviz"
+        "GOLD", "COMMODITY" -> "Altın / Emtia"
+        "BOND" -> "Tahvil / Bono"
+        "BANK" -> "Banka"
+        "CASH" -> "Nakit"
+        else -> "Diğer"
+    }
+
+    private fun sourceLabel(value: String): String = when (value.uppercase(Locale.ROOT)) {
+        "YAHOO_FINANCE", "YAHOO" -> "yahoo"
+        "COINGECKO" -> "coingecko"
+        "FRANKFURTER" -> "frankfurter"
+        "MANUAL" -> "manual"
+        else -> "auto"
+    }
+
+    private fun actionLabel(value: String): String = when (value.uppercase(Locale.ROOT)) {
+        "BUY" -> "Alış"
+        "SELL" -> "Satış"
+        "CASH_IN" -> "Para girişi"
+        "CASH_OUT" -> "Para çıkışı"
+        "TRANSFER" -> "Transfer"
+        "DIVIDEND" -> "Temettü"
+        else -> value
     }
 
     private fun sheetXml(rows: List<List<Any?>>): String {

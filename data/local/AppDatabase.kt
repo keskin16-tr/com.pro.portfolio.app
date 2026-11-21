@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PortfolioSnapshotEntity::class,
         AssetPriceSnapshotEntity::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -133,12 +133,29 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transactions ADD COLUMN applied INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE assets ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE assets ADD COLUMN createdAt INTEGER")
+                db.execSQL("ALTER TABLE assets ADD COLUMN updatedAt INTEGER")
+                db.execSQL("ALTER TABLE transactions ADD COLUMN createdAt INTEGER")
+                db.execSQL("ALTER TABLE transactions ADD COLUMN realizedProfitTry REAL NOT NULL DEFAULT 0.0")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase = INSTANCE ?: synchronized(this) {
             INSTANCE ?: Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "portfolio_local.db"
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                 .build().also { INSTANCE = it }
         }
     }

@@ -27,6 +27,14 @@ class AnalyticsChartView(context: Context) : View(context) {
         textSize = 11f * resources.displayMetrics.scaledDensity
     }
 
+    private fun ellipsize(value: String, maxWidth: Float, p: Paint): String {
+        if (maxWidth <= 0f) return ""
+        if (p.measureText(value) <= maxWidth) return value
+        var end = value.length
+        while (end > 1 && p.measureText(value.substring(0, end) + "…") > maxWidth) end--
+        return value.take(end) + "…"
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (chartValues.isEmpty()) {
@@ -61,15 +69,20 @@ class AnalyticsChartView(context: Context) : View(context) {
         paint.textSize = 16f * resources.displayMetrics.scaledDensity
         canvas.drawText("${chartValues.size} varlık", cx, cy + 5f, paint)
         paint.textAlign = Paint.Align.LEFT
-        val legendX = width * 0.64f
-        val lineHeight = 25f * resources.displayMetrics.density
+        val legendX = width * 0.63f
+        val pctWidth = 34f * resources.displayMetrics.density
+        val labelWidth = (width - legendX - pctWidth - 22f * resources.displayMetrics.density).coerceAtLeast(20f)
+        val lineHeight = 27f * resources.displayMetrics.density
         chartValues.take(7).forEachIndexed { index, value ->
-            val y = 25f * resources.displayMetrics.density + index * lineHeight
+            val y = max(18f * resources.displayMetrics.density, (height - chartValues.take(7).size * lineHeight) / 2f) + index * lineHeight
             paint.color = palette[index % palette.size]
-            canvas.drawCircle(legendX, y, 5f * resources.displayMetrics.density, paint)
-            canvas.drawText(chartLabels.getOrNull(index).orEmpty().take(12), legendX + 12f, y + 4f, labelPaint)
-            canvas.drawText("${(value / total * 100).toInt()}%", legendX + 90f, y + 4f, labelPaint)
+            canvas.drawCircle(legendX, y, 4f * resources.displayMetrics.density, paint)
+            labelPaint.textAlign = Paint.Align.LEFT
+            canvas.drawText(ellipsize(chartLabels.getOrNull(index).orEmpty(), labelWidth, labelPaint), legendX + 10f * resources.displayMetrics.density, y + 4f, labelPaint)
+            labelPaint.textAlign = Paint.Align.RIGHT
+            canvas.drawText("${(value / total * 100).toInt()}%", width - 8f * resources.displayMetrics.density, y + 4f, labelPaint)
         }
+        labelPaint.textAlign = Paint.Align.LEFT
     }
 
 
@@ -126,6 +139,8 @@ class AnalyticsChartView(context: Context) : View(context) {
         canvas.drawLine(12f, zeroY, width - 12f, zeroY, paint)
         val slot = (width - 28f) / chartValues.size.coerceAtLeast(1)
         val barWidth = (slot * 0.58f).coerceAtLeast(5f)
+        val maxTicks = max(2, ((width - 28f) / (58f * resources.displayMetrics.density)).toInt())
+        val every = maxOf(1, kotlin.math.ceil(chartValues.size.toFloat() / maxTicks).toInt())
         chartValues.forEachIndexed { index, value ->
             val x = 14f + index * slot + (slot - barWidth) / 2
             val yValue = if (negativeMin < 0.0) chartTop +
@@ -133,8 +148,10 @@ class AnalyticsChartView(context: Context) : View(context) {
                 else chartBottom - (value / positiveMax).toFloat() * (chartBottom - chartTop)
             paint.color = if (value >= 0.0) palette[index % palette.size] else 0xFFEF7895.toInt()
             canvas.drawRoundRect(RectF(x, minOf(zeroY, yValue), x + barWidth, maxOf(zeroY, yValue)), 5f, 5f, paint)
-            labelPaint.textAlign = Paint.Align.CENTER
-            canvas.drawText(chartLabels.getOrNull(index).orEmpty().take(7), x + barWidth / 2, height - 12f, labelPaint)
+            if (index % every == 0 || index == chartValues.lastIndex) {
+                labelPaint.textAlign = Paint.Align.CENTER
+                canvas.drawText(ellipsize(chartLabels.getOrNull(index).orEmpty(), minOf(54f * resources.displayMetrics.density, slot * every), labelPaint), x + barWidth / 2, height - 12f, labelPaint)
+            }
         }
         labelPaint.textAlign = Paint.Align.LEFT
     }
