@@ -55,7 +55,13 @@ object ExcelImporter {
         val shared = entries["xl/sharedStrings.xml"]?.let(::parseSharedStrings).orEmpty()
         fun rowsFor(vararg names: String): List<List<String>> {
             val wanted = names.map(::normalize).toSet()
-            val sheet = sheets.firstOrNull { normalize(it.first) in wanted } ?: return emptyList()
+            val isAssetSheet = wanted.any { it in setOf("VARLIKLAR", "PORTFOY", "PORTFOLIO", "HOLDINGS") }
+            val sheet = sheets.firstOrNull { normalize(it.first) in wanted }
+                ?: sheets.firstOrNull { entry ->
+                    val name = normalize(entry.first)
+                    if (isAssetSheet) name.contains("VARLIK") || name.contains("PORTFOY") || name.contains("ASSET") || name.contains("HOLDING")
+                    else name.contains("ISLEM") || name.contains("TRANSACTION") || name.contains("TRADE")
+                } ?: return emptyList()
             val bytes = entries[sheet.second] ?: return emptyList()
             return parseRows(bytes, shared)
         }
