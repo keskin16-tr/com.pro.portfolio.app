@@ -1018,6 +1018,7 @@ class MainActivity : AppCompatActivity() {
             val c = asset.category.trim().uppercase(Locale.ROOT)
             val v = visible(asset)
             return when {
+                v == "USDT" -> "Kripto"
                 v == "USD" || c in setOf("FOREX", "CURRENCY", "DÖVİZ", "DOVIZ") -> "Döviz"
                 c in setOf("GOLD", "SILVER", "METAL", "KIYMETLI_MADEN", "KIYMETLIMADEN") || v in setOf("AU", "AG", "XAU", "XAG", "TRY") -> "Emtia"
                 c in setOf("STOCK", "BIST", "HISSE", "US_STOCK", "USA_STOCK", "NASDAQ", "NYSE") -> "Hisse senedi"
@@ -1029,7 +1030,7 @@ class MainActivity : AppCompatActivity() {
             .mapValues { (_, rows) -> rows.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
             .filterValues { it > 0.0 }.entries.sortedByDescending { it.value }
         if (groupedSymbols.isNotEmpty()) addPortfolioChart(container, "Birleştirilmiş varlık dağılımı",
-            "Kategori + görünen sembol bazında; USD/USDT döviz grubunda birleştirilir",
+            "Kategori + görünen sembol bazında; yalnızca USD döviz grubunda birleştirilir",
             com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT,
             groupedSymbols.map { it.value }, groupedSymbols.map { it.key.second + " • " + it.key.first },
             240, currency(groupedSymbols.sumOf { it.value }, "TRY"))
