@@ -1117,6 +1117,26 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
         })
 
+        val dailyReturnsForSharpe = dailyHistory.zipWithNext().mapNotNull { (a, b) ->
+            if (a.marketValue > 0.0) b.marketValue / a.marketValue - 1.0 else null
+        }.filter { it.isFinite() }
+        val averageDailyReturn = dailyReturnsForSharpe.takeIf { it.size >= 2 }?.average()
+        val dailyVariance = if (averageDailyReturn != null) dailyReturnsForSharpe.sumOf {
+            (it - averageDailyReturn) * (it - averageDailyReturn)
+        } / (dailyReturnsForSharpe.size - 1) else 0.0
+        val annualizedSharpe = if (averageDailyReturn != null && dailyVariance > 0.0) {
+            averageDailyReturn / kotlin.math.sqrt(dailyVariance) * kotlin.math.sqrt(252.0)
+        } else null
+        container.addView(TextView(this).apply {
+            text = "PORTFÖY SHARPE ORANI\n" +
+                (annualizedSharpe?.let { String.format(Locale("tr", "TR"), "%.2f", it) } ?: "Yeterli günlük veri yok") +
+                "\nGünlük portföy değer değişimleri • 252 işlem günü • risksiz faiz %0 varsayımı"
+            textSize = 14f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+        })
+
         container.addView(TextView(this).apply {
             text = "Fiyat geçmişi 4.0 sürümünden itibaren cihazda biriktirilir; geçmişe dönük veri üretilmez. İlk fiyat karşılaştırması için en az iki farklı gün kaydı gerekir."
             textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
