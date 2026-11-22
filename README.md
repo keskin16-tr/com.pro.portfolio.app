@@ -2,7 +2,7 @@
 
 **Portfolio Pro**, Kotlin ile geliştirilmiş Android portföy takip uygulamasıdır. Uygulama; farklı varlıkları tek yerde izlemek, alış/satış/para girişi/para çıkışı/transfer/temettü işlemlerini kaydetmek, portföy performansını takip etmek ve Excel dosyaları üzerinden veri aktarımı yapmak için geliştirilir.
 
-> Sürüm: **4.3.1**  
+> Sürüm: **5.0.0**  
 > Android uygulama kimliği: `com.portfolio.app`  
 > Minimum Android: **7.0 (API 24)**  
 > Derleme SDK: **35**
@@ -54,7 +54,7 @@ cd com.pro.portfolio.app
 İlgili geliştirme dalına geçmek için:
 
 ```bash
-git checkout portfolio-pro-4.3
+git checkout portfolio-pro-5.0-analytics
 ```
 
 Debug APK oluşturun:
