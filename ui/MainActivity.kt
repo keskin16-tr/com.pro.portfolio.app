@@ -1012,6 +1012,111 @@ class MainActivity : AppCompatActivity() {
                     suffix = if (asset.currency == "TRY") " ₺" else " $")
             }
         }
+        // 5.0 analytics: group by visible symbol + category, never by provider query symbol.
+        fun visible(asset: AssetEntity) = asset.ticker.trim().ifBlank { asset.name.trim() }.uppercase(Locale.ROOT)
+        fun cat(asset: AssetEntity): String {
+            val c = asset.category.trim().uppercase(Locale.ROOT)
+            val v = visible(asset)
+            return when {
+                v == "USD" || c in setOf("FOREX", "CURRENCY", "DÖVİZ", "DOVIZ") -> "Döviz"
+                c in setOf("GOLD", "SILVER", "METAL", "KIYMETLI_MADEN", "KIYMETLIMADEN") || v in setOf("AU", "AG", "XAU", "XAG", "TRY") -> "Emtia"
+                c in setOf("STOCK", "BIST", "HISSE", "US_STOCK", "USA_STOCK", "NASDAQ", "NYSE") -> "Hisse senedi"
+                c in setOf("CRYPTO", "KRIPTO", "KRİPTO") -> "Kripto"
+                else -> categoryLabel(asset.category)
+            }
+        }
+        val groupedSymbols = active.groupBy { cat(it) to if (cat(it) == "Döviz") "USD" else visible(it) }
+            .mapValues { (_, rows) -> rows.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
+            .filterValues { it > 0.0 }.entries.sortedByDescending { it.value }
+        if (groupedSymbols.isNotEmpty()) addPortfolioChart(container, "Birleştirilmiş varlık dağılımı",
+            "Kategori + görünen sembol bazında; USD/USDT döviz grubunda birleştirilir",
+            com.portfolio.app.ui.chart.PortfolioChartView.Type.DONUT,
+            groupedSymbols.map { it.value }, groupedSymbols.map { it.key.second + " • " + it.key.first },
+            240, currency(groupedSymbols.sumOf { it.value }, "TRY"))
+
+        val equityGroups = active.filter { cat(it) == "Hisse senedi" }.groupBy { visible(it) }
+            .mapValues { (_, rows) -> rows.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
+            .entries.sortedByDescending { it.value }
+        if (equityGroups.isNotEmpty()) addPortfolioChart(container, "ABD + BİST hisseleri",
+            "Tek grafikte, görünen sembole göre birleştirilmiş piyasa değeri",
+            com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR,
+            equityGroups.map { it.value }, equityGroups.map { it.key },
+            maxOf(180, equityGroups.size * 36 + 24))
+
+        val cryptoGroups = active.filter { cat(it) == "Kripto" }.groupBy { visible(it) }
+            .mapValues { (_, rows) -> rows.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
+            .entries.sortedByDescending { it.value }
+        if (cryptoGroups.isNotEmpty()) addPortfolioChart(container, "Kripto varlıklar",
+            "Aynı görünen ada sahip kayıtlar birleştirildi",
+            com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR,
+            cryptoGroups.map { it.value }, cryptoGroups.map { it.key },
+            maxOf(180, cryptoGroups.size * 36 + 24))
+
+        val pnlRows = active.map { asset ->
+            val unrealized = (asset.lastPrice ?: asset.costPrice).minus(asset.costPrice) * asset.quantity
+            val realized = currentTrades.filter { it.assetId == asset.id && it.action == "SELL" }.sumOf { it.realizedProfit }
+            val invested = asset.costPrice * asset.quantity
+            Triple(visible(asset), unrealized + realized, if (invested > 0.0) (unrealized + realized) / invested * 100.0 else 0.0)
+        }.filter { it.second.isFinite() }
+        val winners = pnlRows.sortedByDescending { it.third }.take(8)
+        val losers = pnlRows.sortedBy { it.third }.take(8)
+        if (winners.isNotEmpty()) addPortfolioChart(container, "En çok kazandıranlar",
+            "Gerçekleşmemiş + gerçekleşmiş satış getirisi (%)",
+            com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR,
+            winners.map { it.third }, winners.map { it.first }, maxOf(180, winners.size * 36 + 24), suffix = "%")
+        if (losers.isNotEmpty()) addPortfolioChart(container, "En çok kaybettirenler",
+            "Gerçekleşmemiş + gerçekleşmiş satış getirisi (%)",
+            com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR,
+            losers.map { it.third }, losers.map { it.first }, maxOf(180, losers.size * 36 + 24), suffix = "%")
+
+        val dividendGroups = currentDividends.groupBy { it.ticker.uppercase(Locale.ROOT) }
+            .mapValues { (_, rows) -> rows.sumOf { it.netAmount } }.entries.sortedByDescending { it.value }
+        if (dividendGroups.isNotEmpty()) addPortfolioChart(container, "Temettü gelirleri",
+            "Net temettü toplamı • aynı semboller birleştirildi",
+            com.portfolio.app.ui.chart.PortfolioChartView.Type.HORIZONTAL_BAR,
+            dividendGroups.map { it.value }, dividendGroups.map { it.key },
+            maxOf(180, dividendGroups.size * 36 + 24))
+        val dividendMonths = (0..11).map { offset -> java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, offset - 11) } }
+        val monthlyDividends = dividendMonths.map { month ->
+            currentDividends.filter { d ->
+                val date = java.util.Calendar.getInstance().apply { timeInMillis = d.paymentDate }
+                date.get(java.util.Calendar.YEAR) == month.get(java.util.Calendar.YEAR) &&
+                    date.get(java.util.Calendar.MONTH) == month.get(java.util.Calendar.MONTH)
+            }.sumOf { it.netAmount }
+        }
+        if (monthlyDividends.any { it != 0.0 }) addPortfolioChart(container, "Aylık temettü grafiği",
+            "Son 12 ay • net ödeme", com.portfolio.app.ui.chart.PortfolioChartView.Type.BAR,
+            monthlyDividends, dividendMonths.map { String.format(Locale("tr", "TR"), "%02d/%02d",
+                it.get(java.util.Calendar.MONTH) + 1, it.get(java.util.Calendar.YEAR) % 100) }, 220)
+
+        val dailyHistory = currentSnapshots.sortedBy { it.snapshotDate }.takeLast(31)
+        if (dailyHistory.size >= 2) {
+            val dailyPct = dailyHistory.zipWithNext().map { (a, b) ->
+                if (a.marketValue > 0.0) (b.marketValue / a.marketValue - 1.0) * 100.0 else 0.0
+            }
+            addPortfolioChart(container, "Günlük portföy değişimi",
+                "Önceki günlük portföy kaydına göre (%)",
+                com.portfolio.app.ui.chart.PortfolioChartView.Type.BAR, dailyPct,
+                dailyHistory.drop(1).map { SimpleDateFormat("dd.MM", Locale("tr", "TR")).format(Date(it.snapshotDate)) },
+                230, suffix = "%")
+        }
+
+        val dailyReturns = dailyHistory.zipWithNext().mapNotNull { (a, b) ->
+            if (a.marketValue > 0.0) b.marketValue / a.marketValue - 1.0 else null
+        }.filter { it.isFinite() }
+        val meanReturn = dailyReturns.takeIf { it.size >= 2 }?.average()
+        val variance = if (meanReturn != null) dailyReturns.sumOf { (it - meanReturn) * (it - meanReturn) } / (dailyReturns.size - 1) else 0.0
+        val sharpe = if (meanReturn != null && variance > 0.0) meanReturn / kotlin.math.sqrt(variance) * kotlin.math.sqrt(252.0) else null
+        container.addView(TextView(this).apply {
+            text = "PORTFÖY SHARPE ORANI\n" +
+                (sharpe?.let { String.format(Locale("tr", "TR"), "%.2f", it) } ?: "Yeterli günlük veri yok") +
+                "\nGünlük portföy snapshot'ları • yıllıklandırma 252 gün • risksiz faiz %0 varsayımı"
+            textSize = 14f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+            setPadding(dp(14), dp(16), dp(14), dp(16))
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+        })
+
         container.addView(TextView(this).apply {
             text = "Fiyat geçmişi 4.0 sürümünden itibaren cihazda biriktirilir; geçmişe dönük veri üretilmez. İlk fiyat karşılaştırması için en az iki farklı gün kaydı gerekir."
             textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
