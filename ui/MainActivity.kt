@@ -83,6 +83,7 @@ class MainActivity : AppCompatActivity() {
     private var assetBrokerFilter = "Tümü"
     private var assetSortFilter = "Piyasa değeri"
     private var assetFilterSummary: TextView? = null
+    private var assetBrokerSpinner: android.widget.Spinner? = null
     private var selectedSummaryCurrency = "TRY"
     private var dailyPnlTry: Double? = null
     private var dailyPnlUsd: Double? = null
@@ -1676,14 +1677,14 @@ class MainActivity : AppCompatActivity() {
             }
             row.addView(spinner, LinearLayout.LayoutParams(0, dp(48), 1f))
         }
-        val categories = listOf("Tümü") + currentAssets.map { categoryLabel(it.category) }.distinct().sorted()
-        val currencies = listOf("Tümü") + currentAssets.map { it.currency.uppercase(Locale.ROOT) }.distinct().sorted()
-        val brokers = listOf("Tümü") + currentAssets.map { it.broker.ifBlank { "Belirtilmedi" } }.distinct().sorted()
+        val categories = listOf("Tümü", "Hisse (BIST)", "Amerikan Borsaları", "Yatırım Fonu", "Kripto", "Döviz", "Altın", "Emtia", "Tahvil / Bono", "Banka", "Nakit", "Diğer")
+        val currencies = listOf("Tümü", "TRY", "USD", "USDT", "EUR", "GBP", "JPY", "RUB")
         addSpinner(firstRow, categories, assetCategoryFilter) { assetCategoryFilter = it }
         addSpinner(firstRow, currencies, assetCurrencyFilter) { assetCurrencyFilter = it }
         parent.addView(firstRow)
         val secondRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        addSpinner(secondRow, brokers, assetBrokerFilter) { assetBrokerFilter = it }
+        addSpinner(secondRow, listOf("Tümü"), assetBrokerFilter) { assetBrokerFilter = it }
+        assetBrokerSpinner = secondRow.getChildAt(0) as? android.widget.Spinner
         addSpinner(secondRow, listOf("Piyasa değeri", "Kâr/Zarar", "Sembol A-Z", "Miktar"), assetSortFilter) { assetSortFilter = it }
         parent.addView(secondRow)
         assetFilterSummary = TextView(this).apply {
@@ -1701,6 +1702,16 @@ class MainActivity : AppCompatActivity() {
             list.addView(TextView(this).apply { text = "Henüz varlık yok. Üstteki Varlık ekle butonunu kullanın."; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(12), 0, dp(12)) })
             assetFilterSummary?.text = "0 varlık"
             return
+        }
+        val brokerItems = listOf("Tümü") + currentAssets.map { it.broker.ifBlank { "Belirtilmedi" } }.distinct().sorted()
+        assetBrokerSpinner?.let { spinner ->
+            val oldItems = (spinner.adapter as? android.widget.ArrayAdapter<*>)?.let { adapter ->
+                (0 until adapter.count).map { adapter.getItem(it).toString() }
+            }.orEmpty()
+            if (oldItems != brokerItems) {
+                spinner.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, brokerItems)
+                spinner.setSelection(brokerItems.indexOf(assetBrokerFilter).coerceAtLeast(0), false)
+            }
         }
         val query = assetSearchQuery.trim()
         val filtered = currentAssets.filter { asset ->
