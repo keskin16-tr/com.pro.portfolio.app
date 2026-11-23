@@ -77,6 +77,12 @@ class MainActivity : AppCompatActivity() {
     private var tradeActionFilter = "Tümü"
     private var tradeCurrencyFilter = "Tümü"
     private var tradeDateFilter = "Tümü"
+    private var assetSearchQuery = ""
+    private var assetCategoryFilter = "Tümü"
+    private var assetCurrencyFilter = "Tümü"
+    private var assetBrokerFilter = "Tümü"
+    private var assetSortFilter = "Piyasa değeri"
+    private var assetFilterSummary: TextView? = null
     private var selectedSummaryCurrency = "TRY"
     private var dailyPnlTry: Double? = null
     private var dailyPnlUsd: Double? = null
@@ -299,6 +305,7 @@ class MainActivity : AppCompatActivity() {
             content.addView(pageClock)
             content.addView(body)
             if (id == NAV_ASSETS) content.addView(actionButton("Yeni varlık / alış ekle", R.color.portfolio_green) { showAddAssetDialog() })
+            if (id == NAV_ASSETS) setupAssetFilters(content)
             if (id == NAV_TRADES) {
                 content.addView(actionButton("İşlem Ekle", R.color.portfolio_green) { showAddTransactionDialog() })
             }
@@ -1637,14 +1644,91 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupAssetFilters(parent: LinearLayout) {
+        val search = android.widget.EditText(this).apply {
+            hint = "Sembol, varlık adı veya aracı kurum ara"
+            isSingleLine = true
+            textSize = 14f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    assetSearchQuery = s?.toString().orEmpty()
+                    renderAssetManagement()
+                }
+                override fun afterTextChanged(s: android.text.Editable?) = Unit
+            })
+        }
+        parent.addView(search, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(6) })
+        val firstRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        fun addSpinner(row: LinearLayout, items: List<String>, selected: String, onSelect: (String) -> Unit) {
+            val spinner = android.widget.Spinner(this@MainActivity)
+            spinner.adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, items)
+            spinner.setSelection(items.indexOf(selected).coerceAtLeast(0), false)
+            spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    onSelect(items[position])
+                    renderAssetManagement()
+                }
+            }
+            row.addView(spinner, LinearLayout.LayoutParams(0, dp(48), 1f))
+        }
+        val categories = listOf("Tümü") + currentAssets.map { categoryLabel(it.category) }.distinct().sorted()
+        val currencies = listOf("Tümü") + currentAssets.map { it.currency.uppercase(Locale.ROOT) }.distinct().sorted()
+        val brokers = listOf("Tümü") + currentAssets.map { it.broker.ifBlank { "Belirtilmedi" } }.distinct().sorted()
+        addSpinner(firstRow, categories, assetCategoryFilter) { assetCategoryFilter = it }
+        addSpinner(firstRow, currencies, assetCurrencyFilter) { assetCurrencyFilter = it }
+        parent.addView(firstRow)
+        val secondRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        addSpinner(secondRow, brokers, assetBrokerFilter) { assetBrokerFilter = it }
+        addSpinner(secondRow, listOf("Piyasa değeri", "Kâr/Zarar", "Sembol A-Z", "Miktar"), assetSortFilter) { assetSortFilter = it }
+        parent.addView(secondRow)
+        assetFilterSummary = TextView(this).apply {
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            setPadding(dp(2), dp(4), 0, dp(8))
+        }
+        parent.addView(assetFilterSummary)
+    }
+
     private fun renderAssetManagement() {
         val list = pageLists[NAV_ASSETS] ?: return
         list.removeAllViews()
         if (currentAssets.isEmpty()) {
             list.addView(TextView(this).apply { text = "Henüz varlık yok. Üstteki Varlık ekle butonunu kullanın."; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(12), 0, dp(12)) })
+            assetFilterSummary?.text = "0 varlık"
             return
         }
-        currentAssets.forEach { asset ->
+        val query = assetSearchQuery.trim()
+        val filtered = currentAssets.filter { asset ->
+            val matchesQuery = query.isBlank() || asset.ticker.contains(query, true) ||
+                asset.name.contains(query, true) || asset.broker.contains(query, true)
+            val matchesCategory = assetCategoryFilter == "Tümü" || categoryLabel(asset.category) == assetCategoryFilter
+            val matchesCurrency = assetCurrencyFilter == "Tümü" || asset.currency.equals(assetCurrencyFilter, true)
+            val broker = asset.broker.ifBlank { "Belirtilmedi" }
+            val matchesBroker = assetBrokerFilter == "Tümü" || broker == assetBrokerFilter
+            matchesQuery && matchesCategory && matchesCurrency && matchesBroker
+        }.let { rows ->
+            when (assetSortFilter) {
+                "Kâr/Zarar" -> rows.sortedByDescending { (it.lastPrice ?: it.costPrice).minus(it.costPrice) * it.quantity }
+                "Sembol A-Z" -> rows.sortedBy { it.ticker.uppercase(Locale.ROOT) }
+                "Miktar" -> rows.sortedByDescending { it.quantity }
+                else -> rows.sortedByDescending { it.quantity * (it.lastPrice ?: it.costPrice) }
+            }
+        }
+        assetFilterSummary?.text = "${filtered.size} / ${currentAssets.size} varlık gösteriliyor"
+        if (filtered.isEmpty()) {
+            list.addView(TextView(this).apply {
+                text = "Seçili filtrelerle eşleşen varlık bulunamadı."
+                setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+                setPadding(0, dp(12), 0, dp(12))
+            })
+            return
+        }
+        filtered.forEach { asset ->
             val card = com.google.android.material.card.MaterialCardView(this).apply {
                 radius = dp(16).toFloat()
                 setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
@@ -1654,13 +1738,14 @@ class MainActivity : AppCompatActivity() {
             }
             val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(14), dp(16), dp(14)) }
             val value = asset.quantity * (asset.lastPrice ?: asset.costPrice)
+            val pnl = (asset.lastPrice ?: asset.costPrice).minus(asset.costPrice) * asset.quantity
             column.addView(TextView(this).apply {
                 text = "${asset.ticker} — ${asset.name}"
                 textSize = 16f; typeface = Typeface.DEFAULT_BOLD
                 setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
             })
             column.addView(TextView(this).apply {
-                text = "${categoryLabel(asset.category)} • ${asset.broker}\nMiktar: ${formatNumber(asset.quantity)} • Ort. maliyet: ${currency(asset.costPrice, asset.currency)}\nPiyasa değeri: ${currency(value, asset.currency)}\nKaynak: ${sourceLabel(asset.priceSource)}"
+                text = "${categoryLabel(asset.category)} • ${asset.currency} • ${asset.broker}\nMiktar: ${formatNumber(asset.quantity)} • Ort. maliyet: ${currency(asset.costPrice, asset.currency)}\nPiyasa değeri: ${currency(value, asset.currency)} • K/Z: ${currency(pnl, asset.currency)}\nKaynak: ${sourceLabel(asset.priceSource)}"
                 textSize = 13f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted)); setPadding(0, dp(6), 0, dp(10))
             })
             val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
