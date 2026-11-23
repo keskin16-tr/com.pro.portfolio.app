@@ -895,7 +895,8 @@ class MainActivity : AppCompatActivity() {
                     if (analyticsCategory == category) android.R.color.white else R.color.portfolio_text))
                 setOnClickListener {
                     analyticsCategory = category
-                    chips.childrenSnapshot().forEach { view ->
+                    for (index in 0 until chips.childCount) {
+                        val view = chips.getChildAt(index)
                         if (view is MaterialButton) {
                             val selected = view.text.toString() == analyticsCategory
                             view.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(
@@ -1704,6 +1705,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val brokerItems = listOf("Tümü") + currentAssets.map { it.broker.ifBlank { "Belirtilmedi" } }.distinct().sorted()
+        if (assetBrokerFilter !in brokerItems) assetBrokerFilter = "Tümü"
         assetBrokerSpinner?.let { spinner ->
             val oldItems = (spinner.adapter as? android.widget.ArrayAdapter<*>)?.let { adapter ->
                 (0 until adapter.count).map { adapter.getItem(it).toString() }
