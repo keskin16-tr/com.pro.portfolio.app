@@ -54,6 +54,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var dashboardView: View
     private lateinit var bottomNavigation: BottomNavigationView
     private var analyticsContainer: LinearLayout? = null
+    private var analyticsChartsContainer: LinearLayout? = null
+    private var analyticsSearchQuery = ""
+    private var analyticsCategory = "Tümü"
+    private var analyticsFavoritesOnly = false
+    private var analyticsResultCount: TextView? = null
     private var ratesContainer: LinearLayout? = null
     private var dashboardChartsContainer: LinearLayout? = null
     private val breakdownContainers = mutableMapOf<Int, LinearLayout>()
@@ -365,6 +370,9 @@ class MainActivity : AppCompatActivity() {
                 val chartColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
                 content.addView(chartColumn)
                 analyticsContainer = chartColumn
+                setupAnalyticsControls(chartColumn)
+                analyticsChartsContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                chartColumn.addView(analyticsChartsContainer)
             }
             if (id == NAV_EXPORT) {
                 content.addView(actionButton("Excel dosyasını oluştur (.xlsx)", R.color.portfolio_green) {
@@ -823,6 +831,112 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    private fun chartCategory(title: String): String {
+        val t = title.lowercase(Locale.ROOT)
+        return when {
+            "temettü" in t -> "Temettü"
+            "sharpe" in t || "risk" in t -> "Risk"
+            "kazandıran" in t || "kaybettiren" in t || "kâr" in t || "kar / zarar" in t ||
+                "gerçekleşmiş" in t || "gelir" in t -> "Kâr/Zarar"
+            "dağılım" in t || "hisseleri" in t || "hisse senedi" in t || "kripto varlık" in t -> "Dağılım"
+            "fiyat" in t || "günlük" in t || "performans" in t || "portföy değişimi" in t -> "Performans"
+            else -> "Genel Bakış"
+        }
+    }
+
+    private fun setupAnalyticsControls(parent: LinearLayout) {
+        val search = android.widget.EditText(this).apply {
+            hint = "Grafik ara: temettü, Sharpe, dağılım..."
+            isSingleLine = true
+            textSize = 14f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    analyticsSearchQuery = s?.toString()?.trim().orEmpty()
+                    renderAnalytics()
+                }
+                override fun afterTextChanged(s: android.text.Editable?) = Unit
+            })
+        }
+        parent.addView(search, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(10) })
+
+        val categories = listOf("Tümü", "Genel Bakış", "Performans", "Dağılım", "Kâr/Zarar", "Temettü", "Risk", "Teknik Analiz")
+        val horizontal = android.widget.HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            layoutParams = LinearLayout.LayoutParams(-1, dp(46)).apply { bottomMargin = dp(8) }
+        }
+        val chips = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        categories.forEach { category ->
+            val chip = MaterialButton(this).apply {
+                text = category
+                isAllCaps = false
+                textSize = 12f
+                minHeight = dp(38)
+                insetTop = 0; insetBottom = 0
+                cornerRadius = dp(18)
+                setPadding(dp(12), 0, dp(12), 0)
+                backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(
+                    this@MainActivity,
+                    if (analyticsCategory == category) R.color.portfolio_blue else R.color.portfolio_surface
+                ))
+                setTextColor(ContextCompat.getColor(this@MainActivity,
+                    if (analyticsCategory == category) android.R.color.white else R.color.portfolio_text))
+                setOnClickListener {
+                    analyticsCategory = category
+                    chips.childrenSnapshot().forEach { view ->
+                        if (view is MaterialButton) {
+                            val selected = view.text.toString() == analyticsCategory
+                            view.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(
+                                this@MainActivity, if (selected) R.color.portfolio_blue else R.color.portfolio_surface
+                            ))
+                            view.setTextColor(ContextCompat.getColor(this@MainActivity,
+                                if (selected) android.R.color.white else R.color.portfolio_text))
+                        }
+                    }
+                    renderAnalytics()
+                }
+            }
+            chips.addView(chip, LinearLayout.LayoutParams(-2, dp(38)).apply { marginEnd = dp(7) })
+        }
+        horizontal.addView(chips)
+        parent.addView(horizontal)
+
+        val toolsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val favorites = MaterialButton(this).apply {
+            text = if (analyticsFavoritesOnly) "★ Favoriler" else "☆ Favoriler"
+            isAllCaps = false
+            textSize = 12f
+            minHeight = dp(40)
+            cornerRadius = dp(12)
+            backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
+            setOnClickListener {
+                analyticsFavoritesOnly = !analyticsFavoritesOnly
+                text = if (analyticsFavoritesOnly) "★ Favoriler" else "☆ Favoriler"
+                renderAnalytics()
+            }
+        }
+        analyticsResultCount = TextView(this).apply {
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            gravity = Gravity.CENTER_VERTICAL or Gravity.RIGHT
+        }
+        toolsRow.addView(favorites, LinearLayout.LayoutParams(-2, dp(40)))
+        toolsRow.addView(analyticsResultCount, LinearLayout.LayoutParams(0, dp(40), 1f))
+        parent.addView(toolsRow)
+        parent.addView(View(this).apply {
+            setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+            layoutParams = LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(8); bottomMargin = dp(8) }
+        })
+    }
+
     private fun addPortfolioChart(
         container: LinearLayout, title: String, subtitle: String,
         type: com.portfolio.app.ui.chart.PortfolioChartView.Type,
@@ -830,17 +944,62 @@ class MainActivity : AppCompatActivity() {
         center: String = "", suffix: String = ""
     ) {
         if (values.isEmpty()) return
-        container.addView(TextView(this).apply {
+        val category = chartCategory(title)
+        val query = analyticsSearchQuery.lowercase(Locale.ROOT)
+        val matchesQuery = query.isBlank() || title.lowercase(Locale.ROOT).contains(query) ||
+            subtitle.lowercase(Locale.ROOT).contains(query) || labels.any { it.lowercase(Locale.ROOT).contains(query) }
+        val matchesCategory = analyticsCategory == "Tümü" || analyticsCategory == category ||
+            (analyticsCategory == "Genel Bakış" && category == "Genel Bakış")
+        val favorites = getSharedPreferences("chart_preferences", MODE_PRIVATE)
+            .getStringSet("favorites", emptySet()).orEmpty()
+        val isFavorite = title in favorites
+        if (!matchesQuery || !matchesCategory || (analyticsFavoritesOnly && !isFavorite)) return
+
+        val card = com.google.android.material.card.MaterialCardView(this).apply {
+            radius = dp(16).toFloat()
+            cardElevation = 0f
+            setCardBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
+            strokeWidth = dp(1)
+            setStrokeColor(ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue)))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) }
+        }
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+        }
+        val heading = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val titleBlock = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        titleBlock.addView(TextView(this).apply {
             text = title
             textSize = 15f; typeface = Typeface.DEFAULT_BOLD
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_text))
-            setPadding(0, dp(18), 0, dp(3))
         })
-        if (subtitle.isNotBlank()) container.addView(TextView(this).apply {
+        if (subtitle.isNotBlank()) titleBlock.addView(TextView(this).apply {
             text = subtitle; textSize = 11f
             setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
-            setPadding(0, 0, 0, dp(6))
+            setPadding(0, dp(3), 0, 0)
         })
+        heading.addView(titleBlock, LinearLayout.LayoutParams(0, -2, 1f))
+        val favoriteButton = TextView(this).apply {
+            text = if (isFavorite) "★" else "☆"
+            textSize = 25f
+            gravity = Gravity.CENTER
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_orange))
+            contentDescription = if (isFavorite) "Favorilerden çıkar" else "Favorilere ekle"
+            setPadding(dp(10), 0, dp(4), 0)
+            setOnClickListener {
+                val prefs = getSharedPreferences("chart_preferences", MODE_PRIVATE)
+                val updated = prefs.getStringSet("favorites", emptySet()).orEmpty().toMutableSet()
+                if (!updated.add(title)) updated.remove(title)
+                prefs.edit().putStringSet("favorites", updated).apply()
+                renderAnalytics()
+            }
+        }
+        heading.addView(favoriteButton, LinearLayout.LayoutParams(dp(42), dp(42)))
+        column.addView(heading)
         val chart = com.portfolio.app.ui.chart.PortfolioChartView(this).apply {
             this.type = type; this.values = values; this.labels = labels
             centerValue = center; this.suffix = suffix
@@ -849,7 +1008,32 @@ class MainActivity : AppCompatActivity() {
             } else height
             layoutParams = LinearLayout.LayoutParams(-1, dp(chartHeight))
         }
-        container.addView(chart)
+        column.addView(chart)
+        val enlarge = TextView(this).apply {
+            text = "Grafiği büyüt  ↗"
+            textSize = 11f
+            gravity = Gravity.RIGHT
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_blue))
+            setPadding(0, dp(6), 0, 0)
+            setOnClickListener {
+                val largeChart = com.portfolio.app.ui.chart.PortfolioChartView(this@MainActivity).apply {
+                    this.type = type
+                    this.values = values
+                    this.labels = labels
+                    this.centerValue = center
+                    this.suffix = suffix
+                    layoutParams = LinearLayout.LayoutParams(-1, dp(maxOf(300, height + 70)))
+                }
+                androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                    .setTitle(title)
+                    .setView(largeChart)
+                    .setPositiveButton("Kapat", null)
+                    .show()
+            }
+        }
+        column.addView(enlarge)
+        card.addView(column)
+        container.addView(card)
     }
 
     private fun renderBreakdownPages() {
@@ -940,11 +1124,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderAnalytics() {
-        val container = analyticsContainer ?: return
+        val container = analyticsChartsContainer ?: return
         fun isCurrency(actual: String, requested: String) =
             actual.equals(requested, true) || (requested == "USD" && actual.equals("USDT", true))
         container.removeAllViews()
         val active = currentAssets.filter { it.quantity > 0.0 }
+        analyticsResultCount?.text = if (analyticsFavoritesOnly) "Favori grafikler" else "Grafik kataloğu"
         if (active.isEmpty()) {
             container.addView(TextView(this).apply {
                 text = "Grafikleri görüntülemek için portföye varlık ekleyin."
@@ -1138,6 +1323,12 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_surface))
         })
 
+        if (analyticsCategory == "Teknik Analiz") container.addView(TextView(this).apply {
+            text = "Teknik göstergeler için yeterli tarihsel OHLC verisi bulunmuyor. Mevcut fiyat geçmişi yalnızca kayıtlı fiyat noktalarını içeriyor; RSI, MACD veya mum verisi üretilmiyor."
+            textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
+            setPadding(dp(12), dp(16), dp(12), dp(20))
+        })
+        analyticsResultCount?.text = "${container.childCount} grafik / gösterge"
         container.addView(TextView(this).apply {
             text = "Fiyat geçmişi 4.0 sürümünden itibaren cihazda biriktirilir; geçmişe dönük veri üretilmez. İlk fiyat karşılaştırması için en az iki farklı gün kaydı gerekir."
             textSize = 12f; setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
