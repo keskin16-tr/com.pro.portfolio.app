@@ -480,17 +480,21 @@ class MainActivity : AppCompatActivity() {
         val displayCurrency = selectedSummaryCurrency
         val usdTry = currentRates.firstOrNull { it.title.equals("Dolar / TL", true) }?.value
         val hasTry = currentAssets.any { it.currency.equals("TRY", true) } || currentTrades.any { it.currency.equals("TRY", true) } || currentDividends.any { it.currency.equals("TRY", true) }
-        val hasUsd = currentAssets.any { it.currency.equals("USD", true) || it.currency.equals("USDT", true) } || currentTrades.any { it.currency.equals("USD", true) } || currentDividends.any { it.currency.equals("USD", true) }
+        val hasUsd = currentAssets.any { it.currency.equals("USD", true) } || currentTrades.any { it.currency.equals("USD", true) } || currentDividends.any { it.currency.equals("USD", true) }
+        val hasUsdt = currentAssets.any { it.currency.equals("USDT", true) } || currentTrades.any { it.currency.equals("USDT", true) } || currentDividends.any { it.currency.equals("USDT", true) }
         fun convert(amount: Double, source: String): Double? {
-            if (source.equals(displayCurrency, true)) return amount
+            val normalizedSource = if (source.equals("USDT", true)) "USD" else source
+            if (normalizedSource.equals(displayCurrency, true)) return amount
             val rate = usdTry?.takeIf { it > 0.0 } ?: return null
-            return if (source == "TRY" && displayCurrency == "USD") amount / rate else if (source == "USD" && displayCurrency == "TRY") amount * rate else null
+            return if (normalizedSource == "TRY" && displayCurrency == "USD") amount / rate
+                else if (normalizedSource == "USD" && displayCurrency == "TRY") amount * rate else null
         }
         fun total(calc: (String) -> Double): Double? {
             val t = if (hasTry) convert(calc("TRY"), "TRY") else 0.0
             val u = if (hasUsd) convert(calc("USD"), "USD") else 0.0
-            if ((hasTry && t == null) || (hasUsd && u == null)) return null
-            return (t ?: 0.0) + (u ?: 0.0)
+            val usdt = if (hasUsdt) convert(calc("USDT"), "USDT") else 0.0
+            if ((hasTry && t == null) || (hasUsd && u == null) || (hasUsdt && usdt == null)) return null
+            return (t ?: 0.0) + (u ?: 0.0) + (usdt ?: 0.0)
         }
         // Keep USDT in the crypto bucket; it is not part of the USD cash/equity portfolio.
         fun isCurrency(actual: String, requested: String) = actual.equals(requested, true)
@@ -519,7 +523,8 @@ class MainActivity : AppCompatActivity() {
         val divUsd = currentDividends.filter { it.currency == "USD" && it.paymentDate >= todayStart }.sumOf { it.netAmount }
         val dailyTry = dailyPnlTry?.plus(divTry) ?: divTry.takeIf { it != 0.0 }
         val dailyUsd = dailyPnlUsd?.plus(divUsd) ?: divUsd.takeIf { it != 0.0 }
-        val daily = if ((hasTry && dailyTry == null) || (hasUsd && dailyUsd == null) || (!hasTry && !hasUsd)) null else {
+        // Daily P/L has TRY and USD streams only; do not imply a complete daily figure while USDT positions exist.
+        val daily = if (hasUsdt || (hasTry && dailyTry == null) || (hasUsd && dailyUsd == null) || (!hasTry && !hasUsd)) null else {
             val t = if (hasTry) convert(dailyTry ?: 0.0, "TRY") else 0.0
             val u = if (hasUsd) convert(dailyUsd ?: 0.0, "USD") else 0.0
             if ((hasTry && t == null) || (hasUsd && u == null)) null else (t ?: 0.0) + (u ?: 0.0)
@@ -559,6 +564,8 @@ class MainActivity : AppCompatActivity() {
                 asset.currency.equals(selectedSummaryCurrency, true) -> native
                 rate == null || rate <= 0.0 -> null
                 asset.currency == "USD" && selectedSummaryCurrency == "TRY" -> native * rate
+                asset.currency.equals("USDT", true) && selectedSummaryCurrency == "TRY" -> rate?.takeIf { it > 0.0 }?.let { native * it }
+                asset.currency.equals("USDT", true) && selectedSummaryCurrency == "USD" -> native
                 asset.currency == "TRY" && selectedSummaryCurrency == "USD" -> native / rate
                 else -> null
             }
@@ -574,9 +581,12 @@ class MainActivity : AppCompatActivity() {
         container.removeAllViews()
         if (currentAssets.isEmpty()) return
         val rate = currentRates.firstOrNull { it.title.equals("Dolar / TL", true) }?.value
-        val needsFx = currentAssets.any { !it.currency.equals(selectedSummaryCurrency, true) } ||
-            currentTrades.any { !it.currency.equals(selectedSummaryCurrency, true) } ||
-            currentDividends.any { !it.currency.equals(selectedSummaryCurrency, true) }
+        fun isDisplayEquivalent(currencyCode: String) =
+            currencyCode.equals(selectedSummaryCurrency, true) ||
+                (currencyCode.equals("USDT", true) && selectedSummaryCurrency == "USD")
+        val needsFx = currentAssets.any { !isDisplayEquivalent(it.currency) } ||
+            currentTrades.any { !isDisplayEquivalent(it.currency) } ||
+            currentDividends.any { !isDisplayEquivalent(it.currency) }
         if (needsFx && (rate == null || rate <= 0.0)) {
             container.addView(TextView(this).apply {
                 text = "USD/TRY kuru bekleniyor. Farklı para birimlerindeki veriler eksik toplam göstermemek için grafiklere dahil edilmedi."
@@ -586,9 +596,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
         fun convert(value: Double, code: String): Double? {
-            if (code.equals(selectedSummaryCurrency, true)) return value
+            if (code.equals(selectedSummaryCurrency, true) ||
+                (code.equals("USDT", true) && selectedSummaryCurrency == "USD")) return value
             if (rate == null || rate <= 0.0) return null
-            return if (code == "USD" && selectedSummaryCurrency == "TRY") value * rate
+            return if ((code == "USD" || code == "USDT") && selectedSummaryCurrency == "TRY") value * rate
                 else if (code == "TRY" && selectedSummaryCurrency == "USD") value / rate else null
         }
         val categories = currentAssets.groupBy { categoryLabel(it.category) }.mapNotNull { (name, rows) ->
@@ -635,9 +646,14 @@ class MainActivity : AppCompatActivity() {
         list.removeAllViews()
         val chartAssets = if (pageId == NAV_BIST) currentAssets.filter {
             it.category.uppercase() in listOf("STOCK", "BIST", "HISSE", "US_STOCK")
-        } else currentAssets.filter { it.category.equals("CRYPTO", true) }
+        } else currentAssets.filter {
+            it.category.uppercase(Locale.ROOT) in listOf("CRYPTO", "KRIPTO", "KRİPTO") ||
+                it.ticker.equals("USDT", true)
+        }
         listOf("TRY", "USD").forEach { code ->
-            val currencyAssets = chartAssets.filter { it.currency.equals(code, true) && it.quantity > 0.0 }
+            val currencyAssets = if (pageId == NAV_CRYPTO && code == "USD") {
+                chartAssets.filter { (it.currency.equals("USD", true) || it.currency.equals("USDT", true)) && it.quantity > 0.0 }
+            } else chartAssets.filter { it.currency.equals(code, true) && it.quantity > 0.0 }
             if (currencyAssets.isNotEmpty()) {
                 val marketValues = currencyAssets.map { it.quantity * (it.lastPrice ?: it.costPrice) }
                 val invested = currencyAssets.sumOf { it.quantity * it.costPrice }
@@ -654,7 +670,9 @@ class MainActivity : AppCompatActivity() {
                 summaryCard.addView(LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(13), dp(16), dp(13))
                     addView(TextView(this@MainActivity).apply {
-                        text = "${currencyAssets.size} varlık • ${code} portföy özeti"
+                        text = if (pageId == NAV_CRYPTO && currencyAssets.any { it.currency.equals("USDT", true) })
+                            "${currencyAssets.size} varlık • USD eşdeğeri kripto özeti"
+                        else "${currencyAssets.size} varlık • ${code} portföy özeti"
                         textSize = 13f; typeface = Typeface.DEFAULT_BOLD
                         setTextColor(ContextCompat.getColor(this@MainActivity, R.color.portfolio_muted))
                     })
