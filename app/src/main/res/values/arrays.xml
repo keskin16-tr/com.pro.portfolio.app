@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="asset_category_labels">
+        <item>Hisse (BIST)</item>
+        <item>Amerikan Borsaları</item>
+        <item>Yatırım Fonu</item>
+        <item>Kripto Para</item>
+        <item>Döviz</item>
+        <item>Altın</item>
+        <item>Emtia</item>
+        <item>Tahvil / Bono</item>
+        <item>Banka</item>
+        <item>Nakit</item>
+        <item>Diğer</item>
+    </string-array>
+    <string-array name="asset_currency_labels">
+        <item>Türk Lirası (TRY)</item>
+        <item>ABD Doları (USD)</item>
+        <item>Tether (USDT)</item>
+        <item>Euro (EUR)</item>
+        <item>İngiliz Sterlini (GBP)</item>
+    </string-array>
+    <string-array name="price_source_labels">
+        <item>Otomatik (kategoriye göre)</item>
+        <item>Yahoo Finance</item>
+        <item>CoinGecko</item>
+        <item>Frankfurter (Döviz)</item>
+        <item>Elle giriş</item>
+    </string-array>
+    <string-array name="broker_names">
+        <item>Belirtilmedi</item>
+        <item>İş Yatırım</item>
+        <item>Garanti BBVA Yatırım</item>
+        <item>Yapı Kredi Yatırım</item>
+        <item>Ak Yatırım</item>
+        <item>Ziraat Yatırım</item>
+        <item>QNB Invest</item>
+        <item>Midas</item>
+        <item>PhillipCapital</item>
+        <item>A1 Capital</item>
+        <item>Diğer</item>
+    </string-array>
+</resources>

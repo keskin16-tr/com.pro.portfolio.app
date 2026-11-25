@@ -50,16 +50,115 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <TextView
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
-                    android:background="@drawable/bg_avatar"
-                    android:gravity="center"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCurrencyToggle"
+                    android:layout_width="52dp"
+                    android:layout_height="48dp"
+                    android:minWidth="52dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
                     android:text="₺"
                     android:textColor="@color/portfolio_green"
-                    android:textSize="21sp"
-                    android:textStyle="bold" />
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_surface"
+                    app:cornerRadius="16dp"
+                    app:strokeColor="@color/portfolio_green"
+                    app:strokeWidth="1dp" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvCurrentDateTime"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Tarih ve saat yükleniyor..."
+                android:textColor="@color/portfolio_muted"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/layoutTopRates"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingBottom="8dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="PİYASA ÖZETİ"
+                        android:textColor="@color/portfolio_muted"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.12" />
+                    <TextView
+                        android:id="@+id/tvTopRatesStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Son kayıtlı kurlar"
+                        android:textColor="@color/portfolio_muted"
+                        android:textSize="11sp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:padding="4dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/topRatesRowOne"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <LinearLayout
+                    android:id="@+id/topRatesRowTwo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="9dp"
+                    android:orientation="horizontal" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopAddAsset"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="Varlık ekle"
+                    android:textColor="@color/portfolio_navy"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_green"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_input_add"
+                    app:iconTint="@color/portfolio_navy" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTopSell"
+                    android:layout_width="0dp"
+                    android:layout_height="54dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="İşlem Ekle"
+                    android:textColor="@color/portfolio_navy"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/portfolio_orange"
+                    app:cornerRadius="14dp"
+                    app:icon="@android:drawable/ic_menu_send"
+                    app:iconTint="@color/portfolio_navy" />
+            </LinearLayout>
+            
+            
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
@@ -80,7 +179,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/invested_total"
+                        android:text="@string/portfolio_total_value"
                         android:textColor="@color/portfolio_muted"
                         android:textSize="13sp" />
 
@@ -92,6 +191,47 @@
                         android:text="₺0,00"
                         android:textColor="@color/portfolio_text"
                         android:textSize="32sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:text="Toplam kâr / zarar"
+                        android:textColor="@color/portfolio_muted"
+                        android:textSize="12sp" />
+                    <TextView
+                        android:id="@+id/tvTotalProfitLoss"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="₺0,00"
+                        android:textColor="@color/portfolio_green"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:id="@+id/tvTotalProfitLossPercent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="%0,00 toplam getiri"
+                        android:textColor="@color/portfolio_green"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="Günlük kâr / zarar"
+                        android:textColor="@color/portfolio_muted"
+                        android:textSize="12sp" />
+                    <TextView
+                        android:id="@+id/tvDailyProfitLoss"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="TRY • Veri birikiyor"
+                        android:textColor="@color/portfolio_text"
+                        android:textSize="14sp"
                         android:textStyle="bold" />
 
                     <LinearLayout
@@ -119,10 +259,12 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:gravity="end"
-                            android:text="Alış maliyeti bazında"
+                            android:text="Güncel piyasa değeri"
                             android:textColor="@color/portfolio_muted"
                             android:textSize="11sp" />
                     </LinearLayout>
+
+                    
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -143,7 +285,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Maliyet"
+                    android:text="Piyasa değeri"
                     android:textColor="@color/portfolio_muted"
                     android:textSize="12sp" />
             </LinearLayout>
@@ -169,11 +311,33 @@
                         android:layout_height="wrap_content"
                         android:layout_gravity="center"
                         android:gravity="center"
-                        android:text="Dağılım grafiği için\nvarlık ekleyin"
+                        android:text="TL dağılım grafiği için\nTL cinsinden varlık ekleyin"
                         android:textColor="@color/portfolio_muted"
                         android:textSize="13sp" />
                 </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
+
+            
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="26dp"
+                android:layout_marginBottom="8dp"
+                android:text="İşlem geçmişi"
+                android:textColor="@color/portfolio_text"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvTradeHistory"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_empty"
+                android:padding="16dp"
+                android:text="Henüz işlem bulunmuyor."
+                android:textColor="@color/portfolio_muted"
+                android:textSize="13sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"

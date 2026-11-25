@@ -11,8 +11,8 @@ android {
         applicationId = "com.portfolio.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0.0"
+        versionCode = 13
+        versionName = "5.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     sourceSets {
@@ -20,8 +20,21 @@ android {
             java.setSrcDirs(listOf("../ui", "../data"))
         }
     }
+    val stableStorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+    if (!stableStorePath.isNullOrBlank()) {
+        signingConfigs.create("stable") {
+            storeFile = file(stableStorePath)
+            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+        }
+    }
     buildTypes {
+        debug {
+            if (!stableStorePath.isNullOrBlank()) signingConfig = signingConfigs.getByName("stable")
+        }
         release {
+            if (!stableStorePath.isNullOrBlank()) signingConfig = signingConfigs.getByName("stable")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

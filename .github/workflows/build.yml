@@ -1,19 +1,15 @@
-name: Portfolio Pro Android APK
-
+name: Portfolio Pro Android APK # 4.2 CI
 on:
   push:
-    branches: [main, portfolio-pro-3.0]
+    branches: [main, portfolio-pro-3.0, portfolio-pro-3.1, portfolio-pro-3.2, portfolio-pro-3.3, portfolio-pro-3.4, portfolio-pro-3.5, portfolio-pro-3.6, portfolio-pro-3.7, portfolio-pro-3.8, portfolio-pro-3.9, portfolio-pro-4.0, portfolio-pro-4.1, portfolio-pro-4.2, portfolio-pro-4.3, portfolio-pro-5.0-analytics, portfolio-pro-5.1-advanced-chart-center]
   pull_request:
-    branches: [main]
+    branches: [main, portfolio-pro-3.9, portfolio-pro-4.0, portfolio-pro-4.1]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   build:
     name: Build and verify APK
@@ -31,8 +27,29 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '8.7'
+      - name: Prepare mandatory stable signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64" || (echo "Missing ANDROID_KEYSTORE_BASE64 secret" && exit 1)
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || (echo "Missing ANDROID_KEYSTORE_PASSWORD secret" && exit 1)
+          test -n "$ANDROID_KEY_ALIAS" || (echo "Missing ANDROID_KEY_ALIAS secret" && exit 1)
+          test -n "$ANDROID_KEY_PASSWORD" || (echo "Missing ANDROID_KEY_PASSWORD secret" && exit 1)
+          mkdir -p "$RUNNER_TEMP/portfolio-signing"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/portfolio-signing/portfolio-release.jks"
+          test -s "$RUNNER_TEMP/portfolio-signing/portfolio-release.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/portfolio-signing/portfolio-release.jks" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
       - name: Build debug APK
         run: gradle --no-daemon --stacktrace assembleDebug
+      - name: Verify APK output
+        run: test -s app/build/outputs/apk/debug/app-debug.apk
       - name: Upload APK
         uses: actions/upload-artifact@v5
         with:
