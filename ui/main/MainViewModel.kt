@@ -52,6 +52,8 @@ class MainViewModel(application:Application):AndroidViewModel(application){
  val dailyPnlTry:StateFlow<Double?> = _dailyPnlTry
  private val _dailyPnlUsd=kotlinx.coroutines.flow.MutableStateFlow<Double?>(null)
  val dailyPnlUsd:StateFlow<Double?> = _dailyPnlUsd
+ private val _dailyPnlUsdt=kotlinx.coroutines.flow.MutableStateFlow<Double?>(null)
+ val dailyPnlUsdt:StateFlow<Double?> = _dailyPnlUsdt
  val assets:StateFlow<List<AssetEntity>> = repository.allAssets.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),emptyList())
  val trades:StateFlow<List<TradeEntity>> = repository.allTrades.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),emptyList())
  val tradeCount:StateFlow<Int> = repository.tradeCount.stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),0)
@@ -71,6 +73,7 @@ class MainViewModel(application:Application):AndroidViewModel(application){
     runCatching { _priceSnapshots.value = database.assetPriceSnapshotDao().getAll() }
     _dailyPnlTry.value=runCatching{repository.dailyProfitLoss("TRY")}.getOrNull()
     _dailyPnlUsd.value=runCatching{repository.dailyProfitLoss("USD")}.getOrNull()
+    _dailyPnlUsdt.value=runCatching{repository.dailyProfitLoss("USDT")}.getOrNull()
     syncRates()
     delay(60_000L)
    }
