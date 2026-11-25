@@ -535,7 +535,7 @@ class MainActivity : AppCompatActivity() {
             val signedAmount = if (it >= 0.0) "+${currency(it, displayCurrency)}" else "−${currency(kotlin.math.abs(it), displayCurrency)}"
             val signedPercent = dailyPercent?.let { pct -> String.format(Locale("tr", "TR"), " (%+.2f%%)", pct) }.orEmpty()
             "Bugün: $signedAmount$signedPercent"
-        } ?: "Günlük K/Z: önceki gün kapanış verisi birikiyor"
+        } ?: if (hasUsdt) "Günlük K/Z: USDT fiyat geçmişi birikiyor" else "Günlük K/Z: önceki gün kapanış verisi birikiyor"
         binding.tvDailyProfitLoss.setTextColor(ContextCompat.getColor(
             this, if ((daily ?: 0.0) < 0.0) R.color.portfolio_orange else if (daily != null) R.color.portfolio_green else R.color.portfolio_muted
         ))
@@ -562,10 +562,10 @@ class MainActivity : AppCompatActivity() {
             val native = asset.quantity * (asset.lastPrice ?: asset.costPrice)
             when {
                 asset.currency.equals(selectedSummaryCurrency, true) -> native
+                asset.currency.equals("USDT", true) && selectedSummaryCurrency == "USD" -> native
                 rate == null || rate <= 0.0 -> null
                 asset.currency == "USD" && selectedSummaryCurrency == "TRY" -> native * rate
-                asset.currency.equals("USDT", true) && selectedSummaryCurrency == "TRY" -> rate?.takeIf { it > 0.0 }?.let { native * it }
-                asset.currency.equals("USDT", true) && selectedSummaryCurrency == "USD" -> native
+                asset.currency.equals("USDT", true) && selectedSummaryCurrency == "TRY" -> native * rate
                 asset.currency == "TRY" && selectedSummaryCurrency == "USD" -> native / rate
                 else -> null
             }
