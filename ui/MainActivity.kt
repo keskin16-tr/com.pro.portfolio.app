@@ -492,8 +492,8 @@ class MainActivity : AppCompatActivity() {
             if ((hasTry && t == null) || (hasUsd && u == null)) return null
             return (t ?: 0.0) + (u ?: 0.0)
         }
-        fun isCurrency(actual: String, requested: String) =
-            actual.equals(requested, true) || (requested == "USD" && actual.equals("USDT", true))
+        // Keep USDT in the crypto bucket; it is not part of the USD cash/equity portfolio.
+        fun isCurrency(actual: String, requested: String) = actual.equals(requested, true)
         val marketValue = total { code -> currentAssets.filter { isCurrency(it.currency, code) }.sumOf { it.quantity * (it.lastPrice ?: it.costPrice) } }
         val pnl = total { code ->
             val unrealized = currentAssets.filter { isCurrency(it.currency, code) }.sumOf { it.quantity * ((it.lastPrice ?: it.costPrice) - it.costPrice) }
