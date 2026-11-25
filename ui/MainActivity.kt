@@ -87,6 +87,7 @@ class MainActivity : AppCompatActivity() {
     private var selectedSummaryCurrency = "TRY"
     private var dailyPnlTry: Double? = null
     private var dailyPnlUsd: Double? = null
+    private var dailyPnlUsdt: Double? = null
     private val clockHandler = Handler(Looper.getMainLooper())
     private val clockUpdate = object : Runnable {
         override fun run() {
@@ -166,6 +167,11 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.dailyPnlUsd.collect { dailyPnlUsd = it; updateSummary() }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.dailyPnlUsdt.collect { dailyPnlUsdt = it; updateSummary() }
             }
         }
         lifecycleScope.launch {
@@ -521,13 +527,17 @@ class MainActivity : AppCompatActivity() {
         val todayStart = java.util.Calendar.getInstance().apply { set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0) }.timeInMillis
         val divTry = currentDividends.filter { it.currency == "TRY" && it.paymentDate >= todayStart }.sumOf { it.netAmount }
         val divUsd = currentDividends.filter { it.currency == "USD" && it.paymentDate >= todayStart }.sumOf { it.netAmount }
+        val divUsdt = currentDividends.filter { it.currency.equals("USDT", true) && it.paymentDate >= todayStart }.sumOf { it.netAmount }
         val dailyTry = dailyPnlTry?.plus(divTry) ?: divTry.takeIf { it != 0.0 }
         val dailyUsd = dailyPnlUsd?.plus(divUsd) ?: divUsd.takeIf { it != 0.0 }
-        // Daily P/L has TRY and USD streams only; do not imply a complete daily figure while USDT positions exist.
-        val daily = if (hasUsdt || (hasTry && dailyTry == null) || (hasUsd && dailyUsd == null) || (!hasTry && !hasUsd)) null else {
+        val dailyUsdt = dailyPnlUsdt?.plus(divUsdt) ?: divUsdt.takeIf { it != 0.0 }
+        val daily = if ((hasTry && dailyTry == null) || (hasUsd && dailyUsd == null) ||
+            (hasUsdt && dailyUsdt == null) || (!hasTry && !hasUsd && !hasUsdt)) null else {
             val t = if (hasTry) convert(dailyTry ?: 0.0, "TRY") else 0.0
             val u = if (hasUsd) convert(dailyUsd ?: 0.0, "USD") else 0.0
-            if ((hasTry && t == null) || (hasUsd && u == null)) null else (t ?: 0.0) + (u ?: 0.0)
+            val usdt = if (hasUsdt) convert(dailyUsdt ?: 0.0, "USDT") else 0.0
+            if ((hasTry && t == null) || (hasUsd && u == null) || (hasUsdt && usdt == null)) null
+            else (t ?: 0.0) + (u ?: 0.0) + (usdt ?: 0.0)
         }
         val dailyBase = if (marketValue != null && daily != null) marketValue - daily else null
         val dailyPercent = if (daily != null && dailyBase != null && dailyBase > 0.0) daily / dailyBase * 100.0 else null
@@ -535,7 +545,7 @@ class MainActivity : AppCompatActivity() {
             val signedAmount = if (it >= 0.0) "+${currency(it, displayCurrency)}" else "−${currency(kotlin.math.abs(it), displayCurrency)}"
             val signedPercent = dailyPercent?.let { pct -> String.format(Locale("tr", "TR"), " (%+.2f%%)", pct) }.orEmpty()
             "Bugün: $signedAmount$signedPercent"
-        } ?: if (hasUsdt) "Günlük K/Z: USDT fiyat geçmişi birikiyor" else "Günlük K/Z: önceki gün kapanış verisi birikiyor"
+        } ?: "Günlük K/Z: önceki gün kapanış verisi birikiyor"
         binding.tvDailyProfitLoss.setTextColor(ContextCompat.getColor(
             this, if ((daily ?: 0.0) < 0.0) R.color.portfolio_orange else if (daily != null) R.color.portfolio_green else R.color.portfolio_muted
         ))
